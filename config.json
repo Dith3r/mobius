@@ -1,0 +1,10 @@
+{
+  "state": {
+    "kind": "MONGO",
+    "resolve": "PLAIN",
+    "properties": {
+      "connection_url": "mongodb://mongo:27017/mobius"
+    },
+    "config": {}
+  }
+}
