@@ -1,3 +1,8 @@
+import json
+
+from io import TextIOWrapper
+
+
 class MobiusConfig:
     ...
 
@@ -22,5 +27,8 @@ class MobiusFileMapper:
     __slots__ = ()
 
     @classmethod
-    def from_file(cls, file) -> MobiusConfig:
-        ...
+    def from_file(cls, file: TextIOWrapper) -> MobiusConfig:
+        with file:
+            contents = json.load(file)
+
+            return MobiusJsonMapper.from_json(contents)

@@ -1,3 +1,5 @@
+from argparse import Namespace
+
 from mobius.commons.command import Command
 from mobius.commons.container import Container
 
@@ -9,5 +11,5 @@ class GenerateCommand(Command):
     def parser_fill(cls, parser):
         parser.add_argument('-d', '--directory', default='.', help="directory with migration files", required=True)
 
-    def execute(self, container: Container):
+    def execute(self, container: Container, params: Namespace):
         print("puff")
