@@ -1,7 +1,6 @@
 from argparse import Namespace
 
 from mobius.commons.command import Command
-from mobius.commons.container import Container
 
 
 class DummyCommand(Command):
@@ -12,6 +11,6 @@ class DummyCommand(Command):
         # this is a placeholder
         pass
 
-    def execute(self, container: Container, parameters: Namespace):
+    def execute(self, parameters: Namespace):
         # This is a placeholder
         pass

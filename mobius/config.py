@@ -20,7 +20,7 @@ class MobiusJsonMapper:
 
     @classmethod
     def from_json(cls, json: dict) -> MobiusConfig:
-        ...
+        print(json)
 
 
 class MobiusFileMapper:

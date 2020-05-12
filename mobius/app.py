@@ -7,9 +7,28 @@ from typing import Dict
 from mobius.commands.dummy import DummyCommand
 from mobius.commands.generate import GenerateCommand
 from mobius.commons.command import Command
+from mobius.commons.container import cached_property
 from mobius.config import MobiusConfig
 
 LOG_LEVELS = ["DEBUG", "INFO", "WARN", "ERROR"]
+
+
+class CommandsContainer:
+    def __init__(self, config: MobiusConfig):
+        self.config = config
+
+    @cached_property
+    def generate(self) -> GenerateCommand:
+        return GenerateCommand()
+
+    def get_generate(self):
+        return self.generate
+
+    def get_migrate(self):
+        return DummyCommand()
+
+    def get_difference(self):
+        return DummyCommand()
 
 
 class Container:
@@ -23,7 +42,8 @@ class Bootstrap:
     commands: Dict[str, Command] = {
         "generate": GenerateCommand,
         "migrate": DummyCommand,
-        "difference": DummyCommand
+        "difference": DummyCommand,
+        "sources": DummyCommand,
     }
 
     def __init__(self):
@@ -43,7 +63,7 @@ class Bootstrap:
     def run(self):
         arguments = self.parser.parse_args()
         config_file = MobiusConfig.from_file(arguments.config)
-        command = self.commands.get(arguments.command)
+        command: Command = self.commands.get(arguments.command)
 
 
 def main():
