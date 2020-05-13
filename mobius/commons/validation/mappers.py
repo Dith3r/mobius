@@ -8,7 +8,7 @@ from typing import (
 )
 from uuid import UUID
 
-from mobius.commons.errors import (
+from mobius.commons.validation.errors import (
     error_missing,
     invalid_array,
     invalid_bool,
@@ -21,7 +21,7 @@ from mobius.commons.errors import (
     too_big,
     too_small,
 )
-from mobius.commons.parsers import (
+from mobius.commons.validation.parsers import (
     parse_bool,
     parse_decimal,
     parse_int,
@@ -29,27 +29,57 @@ from mobius.commons.parsers import (
 )
 
 
-class Json:
+class Str:
     __slots__ = ()
-    SEPARATOR = "."
 
-    @classmethod
-    def join_key(cls, *fields: str) -> str:
-        return cls.SEPARATOR.join(fields)
+    @staticmethod
+    def map(data: dict, field_name: str, errors: dict, required: bool = True, minimal: int = None, error_field: str = None) -> Optional[str]:
+        field_value = data.get(field_name)
+        error_field = error_field if error_field else field_value
+
+        return Str.cast(field_value, error_field, errors, required, minimal)
+
+    @staticmethod
+    def parse(value: Any, encoding: Optional[str] = "UTF-8") -> Optional[str]:
+        if isinstance(value, str):
+            return value
+        if isinstance(value, bytes) and encoding:
+            return value.decode(encoding)
+
+    @staticmethod
+    def cast(value: Any, error_field: str, errors: dict, required: bool = True, minimal: Optional[int] = None, default: Optional[str] = None) -> Optional[str]:
+        field_value = default
+        if not value:
+            if required:
+                errors[error_field] = error_missing
+        else:
+            field_value = Str.parse(value)
+
+            if field_value is None or not isinstance(field_value, str):
+                errors[error_field] = invalid_string
+            elif minimal and len(field_value) < minimal:
+                errors[error_field] = too_small(minimal)
+
+        return field_value
 
 
-def map_str(data: dict, field_name: str, errors: dict, required: bool = True, minimal: int = None) -> Optional[str]:
-    field_value = data.get(field_name)
+class Uuid:
+    @staticmethod
+    def map(data: dict, field_name: str, errors: dict, required: bool = True, error_field: str = None) -> Optional[UUID]:
+        field_value = data.get(field_name)
 
-    if not field_value:
-        if required:
-            errors[field_name] = error_missing
-    elif not isinstance(field_value, str):
-        errors[field_name] = invalid_string
-    elif minimal and len(field_value) < minimal:
-        errors[field_name] = too_small(minimal)
+        error_field = error_field if error_field else field_name
 
-    return field_value
+        if not field_value:
+            if required:
+                errors[error_field] = error_missing
+        else:
+            field_value = parse_uuid(field_value)
+
+            if field_value is None:
+                errors[error_field] = invalid_uuid
+
+        return field_value
 
 
 def to_uuid(value: Any, error_field: str, errors: dict, required: bool = True, default=None):

@@ -1,4 +1,4 @@
-from mobius.commons.validators import Error
+from mobius.commons.validation.validators import Error
 
 invalid_object = Error("INVALID_KIND", {"expected": "object"})
 invalid_array = Error("INVALID_KIND", {"expected": "array"})
