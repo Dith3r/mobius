@@ -50,6 +50,8 @@ class DestinationNotWritableDirectoryException(GenerateCommandException):
 
 
 class GenerateCommand(Command):
+    __slots__ = ()
+
     def execute(self, directory: str):
         migrations_directory = Path(directory)
 
@@ -58,3 +60,4 @@ class GenerateCommand(Command):
 
         if not os.access(migrations_directory, os.W_OK):
             raise DestinationNotWritableDirectoryException(migrations_directory.absolute())
+
