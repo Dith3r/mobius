@@ -2,48 +2,32 @@ from argparse import (
     ArgumentParser,
     FileType,
 )
-from typing import Dict
+from typing import (
+    Dict,
+    Type,
+)
 
-from mobius.commands.dummy import DummyCommand
-from mobius.commands.generate import GenerateCommand
-from mobius.commons.command import Command
-from mobius.commons.container import cached_property
+from mobius.commands.dummy import DummyHandler
+from mobius.commands.generate import (
+    GenerateHandler,
+)
+from mobius.commons.command import (
+    Handler,
+)
 from mobius.config import MobiusConfig
+from mobius.container import Container
 
 LOG_LEVELS = ["DEBUG", "INFO", "WARN", "ERROR"]
-
-
-class CommandsContainer:
-    def __init__(self, config: MobiusConfig):
-        self.config = config
-
-    @cached_property
-    def generate(self) -> GenerateCommand:
-        return GenerateCommand()
-
-    def get_generate(self):
-        return self.generate
-
-    def get_migrate(self):
-        return DummyCommand()
-
-    def get_difference(self):
-        return DummyCommand()
-
-
-class Container:
-    def __init__(self, config: MobiusConfig):
-        self.config = config
 
 
 class Bootstrap:
     parser: ArgumentParser
 
-    commands: Dict[str, Command] = {
-        "generate": GenerateCommand,
-        "migrate": DummyCommand,
-        "difference": DummyCommand,
-        "sources": DummyCommand,
+    commands: Dict[str, Type[Handler]] = {
+        "generate": GenerateHandler,
+        "migrate": DummyHandler,
+        "difference": DummyHandler,
+        "sources": DummyHandler,
     }
 
     def __init__(self):
@@ -58,12 +42,15 @@ class Bootstrap:
         for name, command in self.commands.items():
             if command:
                 sub_parser = commands.add_parser(name, help=command.description)
-                command.parser_fill(sub_parser)
+                command.params_add(sub_parser)
 
     def run(self):
         arguments = self.parser.parse_args()
         config_file = MobiusConfig.from_file(arguments.config)
-        command: Command = self.commands.get(arguments.command)
+
+        container = Container(config_file)
+        handler = self.commands[arguments.command](container)
+        handler.execute(arguments)
 
 
 def main():

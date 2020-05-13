@@ -1,16 +1,23 @@
 from argparse import Namespace
 
-from mobius.commons.command import Command
+from mobius.commons.command import (
+    Handler,
+)
 
 
-class DummyCommand(Command):
+class DummyHandler(Handler):
     description = "dummy command"
 
-    @classmethod
-    def parser_fill(cls, parser):
-        # this is a placeholder
+    def execute(self, parameters: Namespace):
+        # pass through
         pass
 
-    def execute(self, parameters: Namespace):
-        # This is a placeholder
+    @classmethod
+    def params_add(cls, parser):
+        # pass through
+        pass
+
+    @classmethod
+    def params_extract(cls, parameters: Namespace):
+        # pass through
         pass

@@ -11,8 +11,8 @@ class cached_property:
         self._name = f"_{constructor.__name__}"
 
     def __get__(self, container, instance):
-        instance = container.__dict__.get(self._name)
-        if instance is None:
-            instance = self._constructor(container)
-            container.__dict__[self._name] = instance
-        return instance
+        property = container.__dict__.get(self._name)
+        if property is None:
+            property = self._constructor(container)
+            container.__dict__[self._name] = property
+        return property
