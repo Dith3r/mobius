@@ -1,5 +1,6 @@
 import os
 from argparse import Namespace
+from datetime import datetime
 from pathlib import Path
 
 from mobius.commons.command import (
@@ -49,6 +50,38 @@ class DestinationNotWritableDirectoryException(GenerateCommandException):
         self.directory = directory
 
 
+class MigrationTemplate:
+    __slots__ = ('migration_id',)
+
+    def __init__(self, migration_id: int):
+        self.migration_id = migration_id
+
+    def to_str(self) -> str:
+        return f"""from mobius import Migration
+
+
+class Migration{self.migration_id}(Migration):
+    def get_id(self) -> int:
+        return {self.migration_id}
+
+    def execute(self):
+        pass
+
+    def description(self) -> str:
+        return ""
+"""
+
+
+class TimestampGenerator:
+    __slots__ = ()
+
+    @classmethod
+    def unow(cls) -> int:
+        pk = int(datetime.utcnow().timestamp() * 100)
+
+        return pk
+
+
 class GenerateCommand(Command):
     __slots__ = ()
 
@@ -61,3 +94,9 @@ class GenerateCommand(Command):
         if not os.access(migrations_directory, os.W_OK):
             raise DestinationNotWritableDirectoryException(migrations_directory.absolute())
 
+        migration_id = TimestampGenerator.unow()
+
+        template = MigrationTemplate(migration_id)
+
+        with migrations_directory / f"{migration_id}.py" as file:
+            file.write_text(template.to_str())
