@@ -136,23 +136,8 @@ def date_to_iso(data: datetime) -> str:
     return data.strftime('%Y-%m-%dT%H:%M:%SZ')
 
 
-def hash_password(password, salt) -> str:
-    return hashlib.sha256(("%s%s%s" % (salt, password, salt)).encode()).hexdigest()
-
-
 def generate_token():
     return "".join([str(randint(100, 999)), str(uuid4()).replace('-', '')])
-
-
-def filter_fields(data: dict, field_set: tuple) -> dict:
-    return {k: v for k, v in data.items() if k in field_set}
-
-
-def date_range(startDate, days):
-    counter = 0
-    while counter < days:
-        yield startDate + timedelta(days=counter)
-        counter += 1
 
 
 def file_md5(file_path):
