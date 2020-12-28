@@ -11,10 +11,10 @@ from mobius.commands.dummy import DummyHandler
 from mobius.commands.generate import (
     GenerateHandler,
 )
+from mobius.commands.sources import SourcesHandler
 from mobius.commons.command import (
     Handler,
 )
-from mobius.config import MobiusConfig
 from mobius.container import Container
 
 LOG_LEVELS = ["DEBUG", "INFO", "WARN", "ERROR"]
@@ -27,7 +27,7 @@ class Bootstrap:
         "generate": GenerateHandler,
         "migrate": DummyHandler,
         "difference": DummyHandler,
-        "sources": DummyHandler,
+        "sources": SourcesHandler,
     }
 
     def __init__(self):
@@ -46,9 +46,10 @@ class Bootstrap:
 
     def run(self):
         arguments = self.parser.parse_args()
-        config_file = MobiusConfig.from_file(arguments.config)
 
-        container = Container(config_file)
+        container = Container()
+        container.configure(arguments.config)
+
         handler = self.commands[arguments.command](container)
         handler.execute(arguments)
 

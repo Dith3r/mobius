@@ -1,10 +1,54 @@
 {
   "state": {
     "kind": "MONGO",
-    "resolve": "PLAIN",
-    "properties": {
-      "connection_url": "mongodb://mongo:27017/mobius"
+    "resolver": "PLAIN",
+    "properties": {},
+    "config": {
+      "connectionUrl": "mongodb://mongo:27017/mobius",
+      "maxPoolSize": 100,
+      "uuid": "standard"
+    }
+  },
+  "sources": {
+    "PLAIN": {
+      "kind": "PLAIN",
+      "resolver": null,
+      "properties": {},
+      "config": {}
     },
-    "config": {}
+    "ENV": {
+      "kind": "ENV",
+      "resolver": "PLAIN",
+      "properties": {},
+      "config": {}
+    },
+    "offerservice": {
+      "kind": "MONGO",
+      "resolver": "PLAIN",
+      "properties": {
+        "connectionUrl": "mongodb://mongo:27017/offerservice"
+      },
+      "config": {}
+    },
+    "akeneo": {
+      "kind": "MYSQL",
+      "resolver": "PLAIN",
+      "properties": {
+        "host": "",
+        "port": null,
+        "username": "",
+        "password": ""
+      }
+    },
+    "test": {
+      "kind": "MYSQL",
+      "resolver": "CONSUL",
+      "properties": {
+        "database": "namespace/database"
+      },
+      "config": {
+        "database": "{database}"
+      }
+    }
   }
 }
