@@ -104,36 +104,41 @@ class DriverJsonMapper:
 class DriverManager:
     __slots__ = ('drivers', 'resolved', 'definitions', 'state_driver')
     drivers: Dict[str, IDriver]
-    resolved: Dict[str, DriverResolvedConfig]
     definitions: Dict[str, IDriverConfig]
     source: IDriverConfig
 
     def __init__(self,
                  state_driver: IDriverConfig,
-                 drivers: Iterable[IDriverConfig]):
+                 driver_configs: Iterable[IDriverConfig]):
         self.drivers = {}
-        self.resolved = {}
         self.definitions = {}
         self.state_driver = state_driver
 
-        for driver in drivers:
-            if isinstance(driver, DriverResolvedConfig):
-                self.resolved[driver.name] = driver
-                self.drivers[driver.name] = driver.initialize()
-            self.definitions[driver.name] = driver
+        for config in driver_configs:
+            if isinstance(config, DriverResolvedConfig):
+                self.drivers[config.name] = config.initialize()
+            self.definitions[config.name] = config
 
-    def get(self, name: str) -> DriverResolvedConfig:
-        source = self.resolved.get(name)
+    def get(self, name: str) -> IDriver:
+        driver = self.drivers.get(name)
 
-        if not source:
-            unresolved = self.definitions.get(name)
+        if not driver:
+            driver_config = self.get_config(name)
+            driver = driver_config.initialize()
 
-            if isinstance(unresolved, DriverResolvedConfig):
-                raise RuntimeError("Desynchronization")
-            else:
-                source = self.resolve(unresolved)
+        return driver
 
-        return source
+    def get_config(self, name: str) -> DriverResolvedConfig:
+        driver_config = self.definitions.get(name)
+
+        if not driver_config:
+            raise RuntimeError("not found")
+
+        if isinstance(driver_config, DriverUnresolvedConfig):
+            driver_config = self.resolve(driver_config)
+            self.definitions[driver_config.name] = driver_config
+
+        return driver_config
 
     def resolve(self, unresolved: IDriverConfig) -> DriverResolvedConfig:
         if not isinstance(unresolved, DriverUnresolvedConfig):
@@ -141,7 +146,5 @@ class DriverManager:
 
         if unresolved.resolver == unresolved.name:
             raise ValueError("Cannot be resolved by itself")
-
-        drivers = set()
 
         raise NotImplementedError
