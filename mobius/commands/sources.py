@@ -8,14 +8,11 @@ class SourcesHandler(Handler):
 
     def execute(self, parameters: Namespace):
         driver_manager = self.container.driver_manager
-        print(driver_manager.definitions)
-        print(driver_manager.resolved)
-        print(driver_manager.get("ENV"))
+
+        driver_manager.resolve_all()
+        for config in driver_manager.configs.values():
+            print(config)
 
     @classmethod
     def params_add(cls, parser):
-        pass
-
-    @classmethod
-    def params_extract(cls, parameters: Namespace):
         pass

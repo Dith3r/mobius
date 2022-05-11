@@ -1,7 +1,6 @@
-from typing import (
-    Optional,
-)
+from typing import Any, Dict, Optional
 
+from mobius.drivers.environment.diver import EnvironmentDriver
 from mobius.drivers.manager import (
     CommonDriverMapper,
     DriverResolvedConfig,
@@ -14,29 +13,44 @@ from mobius.drivers.manager import (
 class EnvironmentConfigDriver(IDriverConfig):
     prefix: Optional[str]
     sufix: Optional[str]
-    name: Optional[str]
+    separator: str
 
-    def __init__(self,
-                 prefix: Optional[str],
-                 sufix: Optional[str]):
+    def __init__(self, prefix: Optional[str], sufix: Optional[str], separator="_"):
         self.prefix = prefix
         self.sufix = sufix
+        self.separator = separator
 
     def __str__(self):
-        return f"{self.__class__.__name__}[name={self.name}, prefix={self.prefix}, sufix={self.sufix}]"
+        return f"{self.__class__.__name__}[prefix={self.prefix}, sufix={self.sufix}, separator={self.separator}]"
 
     def __repr__(self):
         return self.__str__()
 
 
+class EnvironmentUnresolvedConfigDriver(DriverUnresolvedConfig):
+    config: EnvironmentConfigDriver
+
+    def resolve(self, config: Dict[str, Any]) -> DriverResolvedConfig:
+        return EnvironmentResolvedConfigDriver(
+            self.name,
+            config=EnvironmentConfigDriver(
+                self.config.prefix % config if self.config.prefix else None,
+                self.config.sufix % config if self.config.sufix else None,
+            ),
+        )
+
+
 class EnvironmentResolvedConfigDriver(DriverResolvedConfig):
-    def __init__(self,
-                 name: str,
-                 config: EnvironmentConfigDriver):
+    config: EnvironmentConfigDriver
+
+    def __init__(self, name: str, config: EnvironmentConfigDriver):
         super().__init__(name, config)
 
     def initialize(self):
-        pass
+        return EnvironmentDriver(self)
+
+    def __str__(self):
+        return f"{self.__class__.__name__}[name={self.name}, config={self.config}]"
 
 
 class EnvironmentConfigDriverMapper(IConfigDriverMapper):
@@ -67,14 +81,23 @@ class EnvironmentConfigDriverMapper(IConfigDriverMapper):
         if not isinstance(properties, dict):
             raise RuntimeError("Invalid properties for driver %s", name)
 
-        prefix = config.get(_.PREFIX) or cls.DEFAULT.PREFIX
-        sufix = config.get(_.SUFIX) or cls.DEFAULT.SUFIX
+        prefix = config.get(_.PREFIX)
+        if prefix is None:
+            prefix = cls.DEFAULT.PREFIX
+        else:
+            prefix = str(prefix)
+
+        sufix = config.get(_.SUFIX)
+        if sufix is None:
+            sufix = cls.DEFAULT.SUFIX
+        else:
+            sufix = str(sufix)
 
         if resolver:
-            return DriverUnresolvedConfig(name,
-                                          resolver,
-                                          config,
-                                          properties)
+            return EnvironmentUnresolvedConfigDriver(
+                name, resolver, EnvironmentConfigDriver(prefix, sufix), properties
+            )
         else:
-            return EnvironmentResolvedConfigDriver(name,
-                                                   EnvironmentConfigDriver(prefix, sufix))
+            return EnvironmentResolvedConfigDriver(
+                name, EnvironmentConfigDriver(prefix, sufix)
+            )

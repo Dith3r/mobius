@@ -1,6 +1,7 @@
 from argparse import Namespace
 from typing import TYPE_CHECKING
 
+
 if TYPE_CHECKING:
     from mobius.container import Container
 
@@ -8,7 +9,7 @@ if TYPE_CHECKING:
 class Handler:
     description: str
 
-    def __init__(self, container: 'Container'):
+    def __init__(self, container: "Container"):
         self.container = container
 
     def execute(self, parameters: Namespace):
@@ -18,17 +19,13 @@ class Handler:
     def params_add(cls, parser):
         raise NotImplementedError
 
-    @classmethod
-    def params_extract(cls, parameters: Namespace):
-        raise NotImplementedError
-
 
 class Command:
     __slots__ = ()
 
 
 class CommandException(Exception):
-    __slots__ = ('code',)
+    __slots__ = ("code",)
 
     def __init__(self, code: str):
         self.code = code

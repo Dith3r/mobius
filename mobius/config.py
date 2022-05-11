@@ -2,21 +2,23 @@ import json
 from io import TextIOWrapper
 from typing import Dict
 
-from mobius.drivers.manager import (
-    DriverJsonMapper,
-    IDriverConfig,
-)
+from mobius.drivers.manager import DriverJsonMapper, IDriverConfig
 
 
 class MobiusConfig:
-    __slots__ = ('state', 'sources')
+    __slots__ = ("state", "locker", "sources")
     state: IDriverConfig
+    locker: IDriverConfig
     sources: Dict[str, IDriverConfig]
 
-    def __init__(self,
-                 state: IDriverConfig,
-                 sources: Dict[str, IDriverConfig]):
+    def __init__(
+        self,
+        state: IDriverConfig,
+        locker: IDriverConfig,
+        sources: Dict[str, IDriverConfig],
+    ):
         self.state = state
+        self.locker = locker
         self.sources = sources
 
 
@@ -26,24 +28,33 @@ class MobiusJsonMapper:
     class Fields:
         __slots__ = ()
         STATE = "state"
+        LOCKER = "locker"
         SOURCES = "sources"
 
     @classmethod
-    def from_json(cls, raw_json: dict, driver_mapper: DriverJsonMapper) -> MobiusConfig:
+    def from_json(
+        cls, raw_json: dict, driver_config_mapper: DriverJsonMapper
+    ) -> MobiusConfig:
         _ = cls.Fields
 
         state = raw_json[_.STATE]
+        locker = raw_json[_.LOCKER]
         sources = raw_json[_.SOURCES]
 
-        state_driver = driver_mapper.from_json('state', state)
+        locker_config = driver_config_mapper.from_json("locker", locker)
 
-        sources = {name: driver_mapper.from_json(name, driver_config) for name, driver_config in sources.items()}
+        state_config = driver_config_mapper.from_json("state", state)
 
-        return MobiusConfig(state_driver, sources)
+        sources = {
+            name: driver_config_mapper.from_json(name, driver_config)
+            for name, driver_config in sources.items()
+        }
+
+        return MobiusConfig(state_config, locker_config, sources)
 
 
 class MobiusFileMapper:
-    __slots__ = ('driver_mapper',)
+    __slots__ = ("driver_mapper",)
 
     def __init__(self, driver_mapper: DriverJsonMapper):
         self.driver_mapper = driver_mapper

@@ -1,53 +1,60 @@
 {
+  "locker": {
+    "kind": "MONGO",
+    "resolver": "ENV",
+    "properties": {
+      "user": "MONGO_USER",
+      "password": "MONGO_PASSWORD",
+      "server": "MONGO_SERVER"
+    },
+    "config": {
+      "connectionUrl": "mongodb://%(user)s:%(password)s@%(server)s/mobius?authSource=admin",
+      "maxPoolSize": 10,
+      "uuid": "standard"
+    }
+  },
   "state": {
     "kind": "MONGO",
-    "resolver": "PLAIN",
-    "properties": {},
+    "resolver": "ENV",
+    "properties": {
+      "user": "MONGO_USER",
+      "password": "MONGO_PASSWORD",
+      "server": "MONGO_SERVER"
+    },
     "config": {
-      "connectionUrl": "mongodb://mongo:27017/mobius",
-      "maxPoolSize": 100,
+      "connectionUrl": "mongodb://%(user)s:%(password)s@%(server)s/mobius?authSource=admin",
+      "maxPoolSize": 10,
       "uuid": "standard"
     }
   },
   "sources": {
-    "PLAIN": {
-      "kind": "PLAIN",
+    "ENV": {
+      "kind": "ENV",
       "resolver": null,
       "properties": {},
       "config": {}
     },
-    "ENV": {
-      "kind": "ENV",
-      "resolver": "PLAIN",
-      "properties": {},
-      "config": {}
-    },
-    "offerservice": {
-      "kind": "MONGO",
-      "resolver": "PLAIN",
+    "kafka": {
+      "kind": "KAFKA",
+      "resolver": "ENV",
       "properties": {
-        "connectionUrl": "mongodb://mongo:27017/offerservice"
-      },
-      "config": {}
-    },
-    "akeneo": {
-      "kind": "MYSQL",
-      "resolver": "PLAIN",
-      "properties": {
-        "host": "",
-        "port": null,
-        "username": "",
-        "password": ""
-      }
-    },
-    "test": {
-      "kind": "MYSQL",
-      "resolver": "CONSUL",
-      "properties": {
-        "database": "namespace/database"
+        "server": "KAFKA_SERVER"
       },
       "config": {
-        "database": "{database}"
+        "bootstrapServers": "%(server)s"
+      }
+    },
+    "nbeo": {
+      "kind": "MONGO",
+      "resolver": "ENV",
+      "properties": {
+        "user": "MONGO_USER",
+        "password": "MONGO_PASSWORD",
+        "server": "MONGO_SERVER",
+        "database": "MONGO_DB"
+      },
+      "config": {
+        "connectionUrl": "mongodb://%(user)s:%(password)s@%(server)s/%(database)s?authSource=admin"
       }
     }
   }

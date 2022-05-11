@@ -2,12 +2,9 @@ import os
 from argparse import Namespace
 from datetime import datetime
 from pathlib import Path
+from typing import Union
 
-from mobius.commons.command import (
-    Command,
-    CommandException,
-    Handler,
-)
+from mobius.commons.command import Command, CommandException, Handler
 
 
 class GenerateHandler(Handler):
@@ -15,16 +12,18 @@ class GenerateHandler(Handler):
 
     @classmethod
     def params_add(cls, parser):
-        parser.add_argument('-d', '--directory', default='.', help="directory with migration files", required=True)
-
-    @classmethod
-    def params_extract(cls, parameters: Namespace) -> str:
-        return parameters.directory
+        parser.add_argument(
+            "-d",
+            "--directory",
+            default=".",
+            help="directory with migration files",
+            required=True,
+        )
 
     def execute(self, parameters: Namespace):
         generate_command = self.container.commands.generate
-        directory = self.params_extract(parameters)
-        generate_command.execute(directory)
+
+        generate_command.execute(parameters.directory)
 
 
 class GenerateCommandException(CommandException):
@@ -35,23 +34,23 @@ class GenerateCommandException(CommandException):
 
 
 class DestinationNotDirectoryException(GenerateCommandException):
-    __slots__ = ('directory',)
+    __slots__ = ("directory",)
 
-    def __init__(self, directory: str):
+    def __init__(self, directory: Union[str, Path]):
         super().__init__("IS_NOT_DIRECTORY")
         self.directory = directory
 
 
 class DestinationNotWritableDirectoryException(GenerateCommandException):
-    __slots__ = ('directory',)
+    __slots__ = ("directory",)
 
-    def __init__(self, directory: str):
+    def __init__(self, directory: Union[str, Path]):
         super().__init__("IS_NOT_WRITABLE_DIRECTORY")
         self.directory = directory
 
 
 class MigrationTemplate:
-    __slots__ = ('migration_id',)
+    __slots__ = ("migration_id",)
 
     def __init__(self, migration_id: int):
         self.migration_id = migration_id
@@ -63,6 +62,9 @@ class MigrationTemplate:
 class Migration{self.migration_id}(Migration):
     def get_id(self) -> int:
         return {self.migration_id}
+
+    def validate(self):
+        pass
 
     def execute(self):
         pass
@@ -92,7 +94,9 @@ class GenerateCommand(Command):
             raise DestinationNotDirectoryException(migrations_directory.absolute())
 
         if not os.access(migrations_directory, os.W_OK):
-            raise DestinationNotWritableDirectoryException(migrations_directory.absolute())
+            raise DestinationNotWritableDirectoryException(
+                migrations_directory.absolute()
+            )
 
         migration_id = TimestampGenerator.unow()
 

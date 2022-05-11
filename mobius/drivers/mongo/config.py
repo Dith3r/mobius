@@ -1,6 +1,7 @@
-from typing import (
-    Optional,
-)
+from typing import Any, Dict, Optional
+from urllib.parse import quote_plus
+
+from pymongo import MongoClient
 
 from mobius.drivers.manager import (
     CommonDriverMapper,
@@ -9,6 +10,7 @@ from mobius.drivers.manager import (
     IConfigDriverMapper,
     IDriverConfig,
 )
+from mobius.drivers.mongo.driver import MongoDriver
 
 
 class MongoConfigDriver(IDriverConfig):
@@ -16,23 +18,61 @@ class MongoConfigDriver(IDriverConfig):
     uuid: str
     max_pool: int
 
-    def __init__(self,
-                 connection_url: Optional[str],
-                 uuid: str,
-                 max_pool: Optional[int]):
+    def __init__(
+        self, connection_url: Optional[str], uuid: str, max_pool: Optional[int]
+    ):
         self.connection_url = connection_url
         self.uuid = uuid
         self.max_pool = max_pool
 
+    def __str__(self):
+        return f"{self.__class__.__name__}[connection_url={self.connection_url}, uuid={self.uuid}, max_pool={self.max_pool}]"
+
 
 class MongoResolvedConfigDriver(DriverResolvedConfig):
-    def __init__(self,
-                 name: str,
-                 config: MongoConfigDriver):
+    config: MongoConfigDriver
+
+    def __init__(self, name: str, config: MongoConfigDriver):
         super().__init__(name, config)
 
-    def initialize(self):
-        pass
+    def initialize(self) -> MongoDriver:
+        return MongoDriver(
+            self.name,
+            MongoClient(
+                self.config.connection_url,
+                uuidRepresentation=self.config.uuid,
+                maxPoolSize=self.config.max_pool,
+            ),
+        )
+
+    def __str__(self):
+        return f"{self.__class__.__name__}[name={self.name},config={self.config}]"
+
+
+class MongoUnresolvedConfigDriver(DriverUnresolvedConfig):
+    config: MongoConfigDriver
+
+    def __init__(
+        self,
+        name: str,
+        resolver: str,
+        config: MongoConfigDriver,
+        properties: Dict[str, str],
+    ):
+        super().__init__(name, resolver, config, properties)
+
+    def resolve(self, resolved_properties: Dict[str, Any]) -> DriverResolvedConfig:
+        quoted = {
+            key: quote_plus(str(value)) for key, value in resolved_properties.items()
+        }
+
+        mongo_config = MongoConfigDriver(
+            self.config.connection_url % quoted,
+            uuid=self.config.uuid % resolved_properties,
+            max_pool=int(str(self.config.max_pool) % resolved_properties),
+        )
+
+        return MongoResolvedConfigDriver(self.name, mongo_config)
 
 
 class MongoConfigDriverMapper(IConfigDriverMapper):
@@ -42,14 +82,14 @@ class MongoConfigDriverMapper(IConfigDriverMapper):
 
     class DEFAULT:
         __slots__ = ()
-        UUID = 'standard'
+        UUID = "standard"
         MAX_POOL_SIZE = 10
 
     class FIELDS(CommonDriverMapper.Fields):
         __slots__ = ()
         UUID = "uuid"
-        MAX_POOL_SIZE = 'maxPoolSize'
-        CONNECTION_URL = 'connectionUrl'
+        MAX_POOL_SIZE = "maxPoolSize"
+        CONNECTION_URL = "connectionUrl"
 
     @classmethod
     def from_json(cls, name: str, data: dict) -> IDriverConfig:
@@ -70,14 +110,13 @@ class MongoConfigDriverMapper(IConfigDriverMapper):
         max_pool_size = int(config.get(_.MAX_POOL_SIZE, cls.DEFAULT.MAX_POOL_SIZE))
 
         if resolver:
-            return DriverUnresolvedConfig(name,
-                                          resolver,
-                                          config,
-                                          properties)
+            return MongoUnresolvedConfigDriver(
+                name,
+                resolver,
+                MongoConfigDriver(connection_url, uuid, max_pool_size),
+                properties,
+            )
         else:
-            return MongoResolvedConfigDriver(name,
-                                             MongoConfigDriver(
-                                                     connection_url,
-                                                     uuid,
-                                                     max_pool_size)
-                                             )
+            return MongoResolvedConfigDriver(
+                name, MongoConfigDriver(connection_url, uuid, max_pool_size)
+            )

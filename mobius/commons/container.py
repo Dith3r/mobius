@@ -4,7 +4,7 @@ class Container:
 
 # noinspection PyPep8Naming
 class cached_property:
-    __slots__ = ('_constructor', '_name')
+    __slots__ = ("_constructor", "_name")
 
     def __init__(self, constructor):
         self._constructor = constructor

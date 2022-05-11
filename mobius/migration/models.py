@@ -1,20 +1,23 @@
-class MigrationException:
+from typing import Optional
+
+
+class MigrationException(Exception):
     __slots__ = ()
 
 
 class MigrationSkippedException(MigrationException):
-    __slots__ = ()
+    def __init__(self, msg: Optional[str] = None):
+        self.msg = msg
 
 
 class MigrationFailedException(MigrationException):
-    __slots__ = ()
+    def __init__(self, msg: Optional[str] = None):
+        self.msg = msg
 
 
 class Migration:
-    __slots__ = ()
-
-    def __init__(self, manager, logger):
-        ...
+    def __init__(self, manager):
+        self.manager = manager
 
     def validate(self):
         raise NotImplementedError

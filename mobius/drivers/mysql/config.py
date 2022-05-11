@@ -1,6 +1,4 @@
-from typing import (
-    Optional,
-)
+from typing import Optional
 
 from mobius.drivers.manager import (
     CommonDriverMapper,
@@ -19,13 +17,15 @@ class MysqlConfigDriver(IDriverConfig):
     warning_exceptions: bool
     pure: bool
 
-    def __init__(self,
-                 host: Optional[str],
-                 database: Optional[str],
-                 user: Optional[str],
-                 password: Optional[str],
-                 warning_exceptions: Optional[bool],
-                 pure: Optional[bool]):
+    def __init__(
+        self,
+        host: Optional[str],
+        database: Optional[str],
+        user: Optional[str],
+        password: Optional[str],
+        warning_exceptions: Optional[bool],
+        pure: Optional[bool],
+    ):
         self.host = host
         self.database = database
         self.user = user
@@ -35,9 +35,7 @@ class MysqlConfigDriver(IDriverConfig):
 
 
 class MysqlResolvedConfigDriver(DriverResolvedConfig):
-    def __init__(self,
-                 name: str,
-                 config: MysqlConfigDriver):
+    def __init__(self, name: str, config: MysqlConfigDriver):
         super().__init__(name, config)
 
     def initialize(self):
@@ -53,12 +51,12 @@ class MySqlConfigDriverMapper(IConfigDriverMapper):
 
     class FIELDS(CommonDriverMapper.Fields):
         __slots__ = ()
-        USER = 'user'
-        PASSWORD = 'password'
-        HOST = 'host'
-        DATABASE = 'database'
-        WARNING_EXCEPTIONS = 'warningExceptions'
-        PURE = 'pure'
+        USER = "user"
+        PASSWORD = "password"
+        HOST = "host"
+        DATABASE = "database"
+        WARNING_EXCEPTIONS = "warningExceptions"
+        PURE = "pure"
 
     @classmethod
     def from_json(cls, name: str, data: dict) -> IDriverConfig:
@@ -82,16 +80,11 @@ class MySqlConfigDriverMapper(IConfigDriverMapper):
         pure = config.get(_.PURE)
 
         if resolver:
-            return DriverUnresolvedConfig(name,
-                                          resolver,
-                                          config,
-                                          properties)
+            return DriverUnresolvedConfig(name, resolver, config, properties)
         else:
-            return DriverResolvedConfig(name,
-                                        MysqlConfigDriver(host,
-                                                          database,
-                                                          user,
-                                                          password,
-                                                          warning_exceptions,
-                                                          pure)
-                                        )
+            return DriverResolvedConfig(
+                name,
+                MysqlConfigDriver(
+                    host, database, user, password, warning_exceptions, pure
+                ),
+            )
