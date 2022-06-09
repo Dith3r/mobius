@@ -66,9 +66,15 @@ def migration_handler(
     migration_id: str,
     migration_file: DirEntry,
     message: Queue,
+    log_level: int,
 ):
+    logger.setLevel(log_level)
+    extra = {"details": {"migrationId": migration_id}}
     try:
-        logger.info(f"Migration[{migration_id}]: loading file: {migration_file.path}")
+        logger.info(
+            f"Migration[{migration_id}]: loading file: {migration_file.path}",
+            extra=extra,
+        )
         spec = util.spec_from_file_location(
             migration_file.name, location=migration_file
         )
@@ -80,21 +86,21 @@ def migration_handler(
         migration: Migration = migration_class(manager)
 
         logger.info(f"Migration[{migration_id}]: `{migration.description()}`")
-        logger.info(f"Migration[{migration_id}]: Validate")
+        logger.info(f"Migration[{migration_id}]: Validate", extra=extra)
         migration.validate()
-        logger.info(f"Migration[{migration_id}]: Executing")
+        logger.info(f"Migration[{migration_id}]: Executing", extra=extra)
         migration.execute()
-        logger.info(f"Migration[{migration_id}]: Success")
+        logger.info(f"Migration[{migration_id}]: Success", extra=extra)
 
         message.put(SuccessResult(migration.description()))
 
     except MigrationSkippedException as exception:
-        logger.info(f"Migration[{migration_id}]: Skipped")
+        logger.info(f"Migration[{migration_id}]: Skipped", extra=extra)
 
         message.put(SkippedResult(msg=exception.msg))
 
     except MigrationFailedException as exception:
-        logger.info(f"Migration[{migration_id}]: Failed", exc_info=True)
+        logger.info(f"Migration[{migration_id}]: Failed", exc_info=True, extra=extra)
 
         message.put(
             FailedResult(
@@ -106,7 +112,11 @@ def migration_handler(
         )
 
     except Exception as exception:
-        logger.info(f"Migration[{migration_id}]: Unhandled exception", exc_info=True)
+        logger.info(
+            f"Migration[{migration_id}]: Unhandled exception",
+            exc_info=True,
+            extra=extra,
+        )
 
         message.put(
             FailedResult(

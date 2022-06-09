@@ -121,7 +121,10 @@ class MigrateCommand(Command):
                             migration_id = filename_to_id(migration.name)
                             migration_log = id_logs.get(migration_id)
 
-                            logger.info(f"Migration[{migration_id}] starting")
+                            logger.info(
+                                f"Migration[{migration_id}] starting",
+                                extra={"details": {"migrationId": migration_id}},
+                            )
 
                             if migration_log:
                                 if migration_log.hash != migration_hash:
@@ -129,11 +132,19 @@ class MigrateCommand(Command):
                                     if not ignore_hash:
                                         raise ValueError(message)
                                     else:
-                                        logger.warning(message)
+                                        logger.warning(
+                                            message,
+                                            extra={
+                                                "details": {"migrationId": migration_id}
+                                            },
+                                        )
 
                                 if migration_log.state in (Skipped, Succeed):
                                     logger.info(
-                                        f"Migration[{migration_id}]: `{migration_log.msg}` already {migration_log.state}"
+                                        f"Migration[{migration_id}]: `{migration_log.msg}` already {migration_log.state}",
+                                        extra={
+                                            "details": {"migrationId": migration_id}
+                                        },
                                     )
                                     continue
                             else:
@@ -151,13 +162,17 @@ class MigrateCommand(Command):
                                     migration_id,
                                     migration,
                                     queue,
+                                    logger.getEffectiveLevel(),
                                 ),
                             )
                             migration_process.start()
 
                             while migration_process.is_alive():
                                 migration_process.join(0.5)
-                                logger.debug(f"Migration[{migration_id}] await")
+                                logger.debug(
+                                    f"Migration[{migration_id}] await",
+                                    extra={"details": {"migrationId": migration_id}},
+                                )
 
                             result = queue.get(block=False)
 

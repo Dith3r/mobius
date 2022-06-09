@@ -7,6 +7,7 @@ from mobius.commands.generate import GenerateHandler
 from mobius.commands.migrate import MigrateHandler
 from mobius.commands.sources import SourcesHandler
 from mobius.commons.command import Handler
+from mobius.commons.json_logger import JsonFormatter
 from mobius.container import Container
 
 
@@ -56,16 +57,24 @@ class Bootstrap:
 
     def run(self):
         arguments = self.parser.parse_args()
+
+        stream_handler = logging.StreamHandler()
+        stream_handler.setFormatter(JsonFormatter())
+
         logging.basicConfig(
-            level=arguments.log_level,
-            format="%(asctime)s | %(name)s | %(levelname)s | %(message)s",
+            level=arguments.log_level, handlers=[stream_handler], force=True
         )
 
         container = Container()
         container.configure(arguments.config)
 
-        handler = self.commands[arguments.command](container)
-        handler.execute(arguments)
+        try:
+            handler = self.commands[arguments.command](container)
+            handler.execute(arguments)
+        except Exception:
+            logging.getLogger().error(
+                f"Command: `{arguments.command}` failed", exc_info=True
+            )
 
 
 def main():
