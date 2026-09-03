@@ -5,7 +5,6 @@ import traceback
 from dataclasses import dataclass
 from importlib import util
 from multiprocessing import Queue
-from os import DirEntry
 from typing import Any, Dict, List, Optional
 
 from mobius import Migration, MigrationFailedException, MigrationSkippedException
@@ -57,14 +56,11 @@ class DriverManager:
                 driver.close(connection)
 
 
-def close(self):
-    pass
-
-
 def migration_handler(
     connection_configs: Dict[str, DriverResolvedConfig],
     migration_id: str,
-    migration_file: DirEntry,
+    migration_name: str,
+    migration_path: str,
     message: Queue,
     log_level: int,
 ):
@@ -72,12 +68,10 @@ def migration_handler(
     extra = {"details": {"migrationId": migration_id}}
     try:
         logger.info(
-            f"Migration[{migration_id}]: loading file: {migration_file.path}",
+            f"Migration[{migration_id}]: loading file: {migration_path}",
             extra=extra,
         )
-        spec = util.spec_from_file_location(
-            migration_file.name, location=migration_file
-        )
+        spec = util.spec_from_file_location(migration_name, location=migration_path)
         migration_module = util.module_from_spec(spec)
         spec.loader.exec_module(migration_module)
 

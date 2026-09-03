@@ -9,7 +9,7 @@ from uuid import UUID, uuid4
 
 from mobius.commons.command import Command, Handler
 from mobius.commons.data import chunk, file_md5
-from mobius.commons.locker.model import LockFailedException
+from mobius.commons.locker.model import LockFailedException, LockLostException
 from mobius.commons.locker.service import Locker
 from mobius.commons.logger.model import (
     Failed,
@@ -20,6 +20,7 @@ from mobius.commons.logger.model import (
     filename_to_id,
 )
 from mobius.commons.logger.service import Logger
+from mobius.config import MobiusSettings
 from mobius.drivers.manager import DriverManager
 from mobius.migration.runner import (
     FailedResult,
@@ -76,10 +77,17 @@ class MigrateHandler(Handler):
 class MigrateCommand(Command):
     GLOBAL_LOCK = UUID(int=0)
 
-    def __init__(self, driver_manager: DriverManager, logger: Logger, locker: Locker):
+    def __init__(
+        self,
+        driver_manager: DriverManager,
+        logger: Logger,
+        locker: Locker,
+        settings: MobiusSettings,
+    ):
         self.driver_manager = driver_manager
         self.logger = logger
         self.locker = locker
+        self.settings = settings
         self.runtime_id = uuid4()
 
     def execute(self, directory: str, ignore_hash: bool, no_wait: bool):
@@ -89,7 +97,9 @@ class MigrateCommand(Command):
 
         while retries:
             try:
-                with self.locker.lock(self.GLOBAL_LOCK, self.runtime_id, ttl=90):
+                with self.locker.lock(
+                    self.GLOBAL_LOCK, self.runtime_id, ttl=self.settings.lock_ttl
+                ) as lock_handle:
                     retries = False
                     self.logger.ensure_index()
                     self.logger.ensure_all_completed()
@@ -116,6 +126,8 @@ class MigrateCommand(Command):
                         id_logs: Dict[int, Log] = {log.id: log for log in logs}
 
                         for migration in migration_chunk:
+                            lock_handle.ensure_valid()
+
                             migration_hash = file_md5(migration)
 
                             migration_id = filename_to_id(migration.name)
@@ -160,7 +172,8 @@ class MigrateCommand(Command):
                                 args=(
                                     self.driver_manager.configs,
                                     migration_id,
-                                    migration,
+                                    migration.name,
+                                    migration.path,
                                     queue,
                                     logger.getEffectiveLevel(),
                                 ),
@@ -168,6 +181,16 @@ class MigrateCommand(Command):
                             migration_process.start()
 
                             while migration_process.is_alive():
+                                if lock_handle.lost:
+                                    migration_process.terminate()
+                                    migration_process.join()
+
+                                    migration_log.state = Failed
+                                    migration_log.msg = "Lock lost, migration terminated"
+                                    self.logger.update(migration_log)
+
+                                    raise LockLostException()
+
                                 migration_process.join(0.5)
                                 logger.debug(
                                     f"Migration[{migration_id}] await",
@@ -202,4 +225,4 @@ class MigrateCommand(Command):
                 if no_wait:
                     retries = False
                 else:
-                    sleep(1)
+                    sleep(self.settings.lock_retry_interval)

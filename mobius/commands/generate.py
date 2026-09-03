@@ -102,5 +102,5 @@ class GenerateCommand(Command):
 
         template = MigrationTemplate(migration_id)
 
-        with migrations_directory / f"{migration_id}.py" as file:
-            file.write_text(template.to_str())
+        migration_file = migrations_directory / f"{migration_id}.py"
+        migration_file.write_text(template.to_str())

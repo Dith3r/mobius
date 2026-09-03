@@ -1,2 +1,4 @@
-confluent-kafka==1.8.2
-pymongo==4.1.1
+confluent-kafka>=2.15.0
+pymongo>=4.17.0
+psycopg[binary]>=3.3.5
+PyMySQL==1.2.0

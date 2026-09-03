@@ -1,4 +1,5 @@
 import logging
+import sys
 from argparse import ArgumentParser, FileType
 from typing import Dict, Type
 
@@ -75,6 +76,7 @@ class Bootstrap:
             logging.getLogger().error(
                 f"Command: `{arguments.command}` failed", exc_info=True
             )
+            sys.exit(1)
 
 
 def main():

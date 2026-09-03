@@ -14,6 +14,6 @@ setup(
     ),
     entry_points={"console_scripts": ["mobius=mobius.app:main"]},
     install_requires=requirements,
-    python_requires=">=3.8",
+    python_requires=">=3.10",
     zip_safe=True,
 )

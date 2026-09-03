@@ -1,4 +1,8 @@
 {
+  "settings": {
+    "lockTtl": 90,
+    "lockRetryInterval": 1
+  },
   "locker": {
     "kind": "MONGO",
     "resolver": "ENV",
@@ -44,7 +48,7 @@
         "bootstrapServers": "%(server)s"
       }
     },
-    "nbeo": {
+    "testProject": {
       "kind": "MONGO",
       "resolver": "ENV",
       "properties": {

@@ -1,0 +1,86 @@
+{
+  "settings": {
+    "lockTtl": 90,
+    "lockRetryInterval": 1
+  },
+  "locker": {
+    "kind": "POSTGRES",
+    "resolver": "ENV",
+    "properties": {
+      "user": "PG_USER",
+      "password": "PG_PASSWORD",
+      "server": "PG_SERVER"
+    },
+    "config": {
+      "connectionUrl": "postgresql://%(user)s:%(password)s@%(server)s/mobius"
+    }
+  },
+  "state": {
+    "kind": "POSTGRES",
+    "resolver": "ENV",
+    "properties": {
+      "user": "PG_USER",
+      "password": "PG_PASSWORD",
+      "server": "PG_SERVER"
+    },
+    "config": {
+      "connectionUrl": "postgresql://%(user)s:%(password)s@%(server)s/mobius"
+    }
+  },
+  "sources": {
+    "ENV": {
+      "kind": "ENV",
+      "resolver": null,
+      "properties": {},
+      "config": {}
+    },
+    "db": {
+      "kind": "POSTGRES",
+      "resolver": "ENV",
+      "properties": {
+        "user": "PG_USER",
+        "password": "PG_PASSWORD",
+        "server": "PG_SERVER"
+      },
+      "config": {
+        "connectionUrl": "postgresql://%(user)s:%(password)s@%(server)s/app"
+      }
+    },
+    "db_autocommit": {
+      "kind": "POSTGRES",
+      "resolver": "ENV",
+      "properties": {
+        "user": "PG_USER",
+        "password": "PG_PASSWORD",
+        "server": "PG_SERVER"
+      },
+      "config": {
+        "connectionUrl": "postgresql://%(user)s:%(password)s@%(server)s/app",
+        "autocommit": true
+      }
+    },
+    "documents": {
+      "kind": "MONGO",
+      "resolver": "ENV",
+      "properties": {
+        "user": "MONGO_USER",
+        "password": "MONGO_PASSWORD",
+        "server": "MONGO_SERVER",
+        "database": "MONGO_DB"
+      },
+      "config": {
+        "connectionUrl": "mongodb://%(user)s:%(password)s@%(server)s/%(database)s?authSource=admin"
+      }
+    },
+    "queue": {
+      "kind": "KAFKA",
+      "resolver": "ENV",
+      "properties": {
+        "server": "KAFKA_SERVER"
+      },
+      "config": {
+        "bootstrapServers": "%(server)s"
+      }
+    }
+  }
+}

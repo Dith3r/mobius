@@ -6,6 +6,10 @@ class LockFailedException(Exception):
     pass
 
 
+class LockLostException(Exception):
+    pass
+
+
 class Lock:
     __slots__ = ("id", "valid_till", "transaction_id", "holder_id")
 

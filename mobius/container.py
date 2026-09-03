@@ -14,6 +14,7 @@ from mobius.drivers.manager import DriverJsonMapper, DriverManager
 from mobius.drivers.mongo.config import MongoConfigDriverMapper
 from mobius.drivers.mysql.config import MySqlConfigDriverMapper
 from mobius.drivers.plain.config import PlainConfigDriverMapper
+from mobius.drivers.postgres.config import PostgresConfigDriverMapper
 
 
 class CommandsContainer:
@@ -27,7 +28,10 @@ class CommandsContainer:
     @cached_property
     def migrate(self) -> MigrateCommand:
         return MigrateCommand(
-            self.container.driver_manager, self.container.logger, self.container.locker
+            self.container.driver_manager,
+            self.container.logger,
+            self.container.locker,
+            self.container.config.settings,
         )
 
 
@@ -54,6 +58,7 @@ class Container:
         driver_mapper.register(MongoConfigDriverMapper)
         driver_mapper.register(MySqlConfigDriverMapper)
         driver_mapper.register(KafkaConfigDriverMapper)
+        driver_mapper.register(PostgresConfigDriverMapper)
 
         return driver_mapper
 
