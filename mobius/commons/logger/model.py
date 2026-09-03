@@ -1,5 +1,6 @@
+import re
 from datetime import datetime
-from typing import Optional, Type
+from typing import Dict, Optional, Type
 
 
 class Simple(type):
@@ -61,6 +62,30 @@ class Log:
         datetime_now = datetime.utcnow()
 
         return cls(log_id, datetime_now, datetime_now, hash, New, msg)
+
+
+class StateCodec:
+    """Single source of truth for the persisted one-letter state encoding —
+    shared by every state-store backend. The letters are a wire format:
+    never change them for existing states."""
+
+    __slots__ = ()
+
+    TO: Dict[Type[State], str] = {
+        New: "N",
+        InProgress: "I",
+        Skipped: "S",
+        Succeed: "O",
+        Failed: "F",
+    }
+    FROM: Dict[str, Type[State]] = {value: key for key, value in TO.items()}
+
+
+MIGRATION_FILENAME = re.compile(r"^\d+\.py$")
+
+
+def is_migration_filename(filename: str) -> bool:
+    return MIGRATION_FILENAME.match(filename) is not None
 
 
 def filename_to_id(filename: str) -> int:

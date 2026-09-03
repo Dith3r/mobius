@@ -1,30 +1,15 @@
-from typing import Dict, List, Type
+from typing import List, Type
 
 from psycopg import Connection, sql
 from psycopg.rows import dict_row
 
-from mobius.commons.data import reverse_map
-from mobius.commons.logger.model import (
-    Failed,
-    InProgress,
-    Log,
-    New,
-    Skipped,
-    State,
-    Succeed,
-)
+from mobius.commons.logger.model import Log, State, StateCodec
 from mobius.commons.logger.repository import LogsRepository
 
 
 class StatePostgresMapper:
-    TO: Dict[Type[State], str] = {
-        New: "N",
-        InProgress: "I",
-        Skipped: "S",
-        Succeed: "O",
-        Failed: "F",
-    }
-    FROM = reverse_map(TO)
+    TO = StateCodec.TO
+    FROM = StateCodec.FROM
 
     @classmethod
     def to_row(cls, state: Type[State]) -> str:

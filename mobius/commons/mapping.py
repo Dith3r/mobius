@@ -202,6 +202,19 @@ def _as_bool(value: Any) -> bool | None:
     return value if isinstance(value, bool) else None
 
 
+def _as_lenient_int(value: Any) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        try:
+            return int(value)
+        except ValueError:
+            return None
+    return None
+
+
 def _as_object(value: Any) -> dict | None:
     return value if isinstance(value, dict) else None
 
@@ -258,6 +271,11 @@ class ObjectContext:
 
     def find_bool(self, field: str) -> Checked[bool]:
         return self._find_field(field, "Bool", _as_bool)
+
+    def find_lenient_int(self, field: str) -> Checked[int]:
+        """find_int that also accepts an integer written as a JSON string —
+        for fields that older configs stored as strings."""
+        return self._find_field(field, "Int", _as_lenient_int)
 
     def find_string_map(self, field: str) -> Checked[Dict[str, str]]:
         return self._find_field(field, "StringMap", _as_string_map)

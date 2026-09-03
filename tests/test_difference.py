@@ -67,5 +67,17 @@ def test_ignores_non_python_files(tmp_path):
     command, _ = make_command()
 
     (tmp_path / "notes.txt").write_text("not a migration")
+    (tmp_path / "helpers.py").write_text("# not a migration either")
 
     assert command.execute(str(tmp_path)) == []
+
+
+def test_ignore_hash_suppresses_changed_file_reporting(tmp_path):
+    command, logs = make_command()
+
+    file = write_migration(tmp_path, 100)
+    record(logs, file, Succeed)
+    file.write_text(file.read_text() + "# changed\n")
+
+    assert command.execute(str(tmp_path), ignore_hash=True) == []
+    assert len(command.execute(str(tmp_path), ignore_hash=False)) == 1

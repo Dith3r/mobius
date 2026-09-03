@@ -1,13 +1,23 @@
 from __future__ import annotations
 
+import logging
 from argparse import Namespace
 from os import scandir
 from typing import Dict, List
 
 from mobius.commons.command import Command, Handler
 from mobius.commons.data import chunk, file_md5
-from mobius.commons.logger.model import Log, Skipped, Succeed, filename_to_id
+from mobius.commons.logger.model import (
+    Log,
+    Skipped,
+    Succeed,
+    filename_to_id,
+    is_migration_filename,
+)
 from mobius.commons.logger.service import Logger
+
+
+logger = logging.getLogger("difference")
 
 
 class MigrationDifference:
@@ -37,11 +47,21 @@ class DifferenceHandler(Handler):
             help="directory with migration files",
             required=True,
         )
+        parser.add_argument(
+            "-i",
+            "--ignore-hash",
+            default=False,
+            help="Ignore migration files hashes",
+            action="store_true",
+            dest="no_hash",
+        )
 
     def execute(self, parameters: Namespace):
         difference_command = self.container.commands.difference
 
-        differences = difference_command.execute(parameters.directory)
+        differences = difference_command.execute(
+            parameters.directory, parameters.no_hash
+        )
 
         if not differences:
             print("All migrations applied.")
@@ -58,14 +78,32 @@ class DifferenceCommand(Command):
     def __init__(self, logger: Logger):
         self.logger = logger
 
-    def execute(self, directory: str) -> List[MigrationDifference]:
+    def execute(
+        self, directory: str, ignore_hash: bool = False
+    ) -> List[MigrationDifference]:
         self.logger.ensure_index()
+
+        files = [
+            dir_entry for dir_entry in scandir(directory) if dir_entry.is_file()
+        ]
+
+        ignored = sorted(
+            dir_entry.name
+            for dir_entry in files
+            if dir_entry.name.endswith(".py")
+            and not is_migration_filename(dir_entry.name)
+        )
+        if ignored:
+            logger.warning(
+                f"Ignoring python files that are not migrations "
+                f"(name must be <numeric id>.py): {ignored}"
+            )
 
         migration_files = sorted(
             (
                 dir_entry
-                for dir_entry in scandir(directory)
-                if dir_entry.is_file() and dir_entry.name.endswith(".py")
+                for dir_entry in files
+                if is_migration_filename(dir_entry.name)
             ),
             key=lambda dir_entry: dir_entry.name,
         )
@@ -94,7 +132,7 @@ class DifferenceCommand(Command):
                             dir_entry.name, migration_id, f"state: {log.state}"
                         )
                     )
-                elif log.hash != file_md5(dir_entry):
+                elif not ignore_hash and log.hash != file_md5(dir_entry):
                     differences.append(
                         MigrationDifference(
                             dir_entry.name, migration_id, "applied but file changed"

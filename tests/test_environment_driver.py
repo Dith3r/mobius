@@ -39,3 +39,22 @@ def test_mapper_builds_resolved_config():
     )
 
     assert isinstance(config, EnvironmentResolvedConfigDriver)
+    assert config.config.separator == "_"
+
+
+def test_mapper_parses_separator(monkeypatch):
+    monkeypatch.setenv("PRE__MOBIUS_TEST_USER", "carol")
+
+    config = EnvironmentConfigDriverMapper.from_json(
+        "ENV",
+        {
+            "kind": "ENV",
+            "resolver": None,
+            "config": {"prefix": "PRE", "separator": "__"},
+        },
+    )
+
+    assert config.config.separator == "__"
+
+    driver = config.initialize()
+    assert driver.resolve({"user": "MOBIUS_TEST_USER"}) == {"user": "carol"}

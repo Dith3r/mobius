@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, Dict
 from urllib.parse import quote_plus
 
+from mobius.commons.data import mask_url_credentials
 from mobius.commons.mapping import InvalidValueError, ObjectContext
 from mobius.drivers.manager import (
     CommonDriverMapper,
@@ -30,8 +31,9 @@ class PostgresConfigDriver(IDriverConfig):
         self.autocommit = autocommit
 
     def __str__(self):
+        url = mask_url_credentials(self.connection_url) if self.connection_url else None
         return (
-            f"{self.__class__.__name__}[connection_url={self.connection_url}, "
+            f"{self.__class__.__name__}[connection_url={url}, "
             f"connect_timeout={self.connect_timeout}, autocommit={self.autocommit}]"
         )
 

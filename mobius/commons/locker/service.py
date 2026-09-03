@@ -66,7 +66,11 @@ class Locker:
             yield LockHandle(transaction_id, lost)
         finally:
             stop.set()
-            heartbeat.join()
+            heartbeat.join(5)
+            if heartbeat.is_alive():
+                # blocked on a dead connection; it is a daemon thread, so
+                # releasing the lock must not wait for it
+                logger.warning("Lock heartbeat thread did not stop in time")
 
             self.locks_repository.delete_by_transaction_id(transaction_id)
 

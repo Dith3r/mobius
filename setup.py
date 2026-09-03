@@ -8,7 +8,7 @@ with open("requirements.txt", "r") as file:
 
 setup(
     name="mobius",
-    version="1.0",
+    version="3.0",
     packages=find_namespace_packages(
         include=["mobius", "mobius.*"], exclude=["test", "build"]
     ),

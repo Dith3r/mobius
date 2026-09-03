@@ -1,19 +1,10 @@
 import re
-from typing import Dict, List, Type
+from typing import List, Type
 
 from pymysql.cursors import DictCursor
 from pymysql.err import IntegrityError
 
-from mobius.commons.data import reverse_map
-from mobius.commons.logger.model import (
-    Failed,
-    InProgress,
-    Log,
-    New,
-    Skipped,
-    State,
-    Succeed,
-)
+from mobius.commons.logger.model import Log, State, StateCodec
 from mobius.commons.logger.repository import LogsRepository
 from mobius.commons.repositories import UniqueViolationError
 
@@ -22,14 +13,8 @@ TABLE_NAME = re.compile(r"^[A-Za-z0-9_]+$")
 
 
 class StateMySqlMapper:
-    TO: Dict[Type[State], str] = {
-        New: "N",
-        InProgress: "I",
-        Skipped: "S",
-        Succeed: "O",
-        Failed: "F",
-    }
-    FROM = reverse_map(TO)
+    TO = StateCodec.TO
+    FROM = StateCodec.FROM
 
     @classmethod
     def to_row(cls, state: Type[State]) -> str:

@@ -39,6 +39,7 @@ class EnvironmentUnresolvedConfigDriver(DriverUnresolvedConfig):
             config=EnvironmentConfigDriver(
                 self.config.prefix % config if self.config.prefix else None,
                 self.config.sufix % config if self.config.sufix else None,
+                self.config.separator,
             ),
         )
 
@@ -64,11 +65,13 @@ class EnvironmentConfigDriverMapper(IConfigDriverMapper):
         __slots__ = ()
         PREFIX = ""
         SUFIX = ""
+        SEPARATOR = "_"
 
     class FIELDS(CommonDriverMapper.Fields):
         __slots__ = ()
         PREFIX = "prefix"
         SUFIX = "sufix"
+        SEPARATOR = "separator"
 
     @classmethod
     def from_context(
@@ -82,11 +85,18 @@ class EnvironmentConfigDriverMapper(IConfigDriverMapper):
         def read_config(config: ObjectContext) -> EnvironmentConfigDriver | None:
             prefix = config.find_string(_.PREFIX).or_else(cls.DEFAULT.PREFIX)
             sufix = config.find_string(_.SUFIX).or_else(cls.DEFAULT.SUFIX)
+            separator = config.find_string(_.SEPARATOR).or_else(
+                cls.DEFAULT.SEPARATOR
+            )
 
-            return config.construct(lambda: EnvironmentConfigDriver(prefix, sufix))
+            return config.construct(
+                lambda: EnvironmentConfigDriver(prefix, sufix, separator)
+            )
 
         env_config = context.find_object(_.CONFIG, read_config).or_else(
-            EnvironmentConfigDriver(cls.DEFAULT.PREFIX, cls.DEFAULT.SUFIX)
+            EnvironmentConfigDriver(
+                cls.DEFAULT.PREFIX, cls.DEFAULT.SUFIX, cls.DEFAULT.SEPARATOR
+            )
         )
 
         if resolver:

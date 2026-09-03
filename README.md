@@ -1,5 +1,7 @@
 # Mobius
 
+[![CI](https://github.com/Dith3r/mobius/actions/workflows/ci.yml/badge.svg)](https://github.com/Dith3r/mobius/actions/workflows/ci.yml)
+
 Mobius is an **external, storage-agnostic schema and data migration tool**. Migrations are plain Python files, discovered from a directory, executed exactly once, in order, under a distributed lock — against any combination of storages (MongoDB, PostgreSQL, MySQL, Kafka, …) in a single migration run.
 
 > **⚠️ Disclaimer.** Mobius executes arbitrary code against your databases. It is provided **as is, without warranty of any kind** — the author gives no guarantees and accepts **no responsibility for data loss** or any other damage resulting from its use. The ambition is absolutely to ship bug-free software (see the test suite), but migrations are inherently destructive territory: **test every migration against a non-production copy first, and have backups you have actually restored from.**
@@ -38,7 +40,7 @@ A `mobius migrate` run:
 1. Resolves all driver configurations (secrets are pulled from resolvers — see below).
 2. Acquires the **global lock** in the locker storage. If another runner holds it, mobius waits (or exits immediately with `--no-wait`). While held, a background heartbeat extends the lock TTL; if the heartbeat ever fails, the currently running migration is terminated and the run aborts.
 3. Verifies the **state log** contains no `Failed` or `InProgress` entries from previous runs — if it does, the run refuses to start.
-4. Scans the migrations directory for `*.py` files, sorted by filename.
+4. Scans the migrations directory for numerically named `<id>.py` files, sorted by filename (other `.py` files are ignored with a warning).
 5. For each migration: checks its md5 against the state log (already-applied migrations are skipped; a *changed* applied migration aborts the run), marks it `InProgress`, and executes it **in a separate child process**. The result (`Succeed` / `Skipped` / `Failed`) is written back to the state log.
 6. Stops at the first failure; releases the lock on the way out. Exit code is `0` on success, `1` on any failure.
 
@@ -121,6 +123,8 @@ A config with `"resolver": "<source name>"` is *unresolved* until runtime. The n
 
 This means `config.json` is safe to commit: it contains variable *names*, never credentials.
 
+Resolution **fails closed**: a property the resolver cannot find (unset variable, missing Consul key) aborts the run naming the property and resolver — it is never silently interpolated. Resolved credentials are masked when configs are printed (`mobius sources`, logs).
+
 ### Driver kinds
 
 **`ENV`** — resolver that reads environment variables. Optional `config`: `prefix`, `sufix`, `separator` (default `_`) to namespace lookups (`PRE_<NAME>_POST`).
@@ -170,7 +174,7 @@ mobius -c config.json migrate -d ./migrations [-i] [-n]
 |---|---|
 | `-d, --directory` | Directory containing migration files (required) |
 | `-i, --ignore-hash` | Warn instead of abort when an applied migration's file has changed. Use only when you know why the hash differs (e.g. reformatting) — it weakens the "what ran is what's on disk" guarantee. |
-| `-n, --no-wait` | If the global lock is held, exit immediately instead of retrying every `settings.lockRetryInterval` seconds |
+| `-n, --no-wait` | If the global lock is held, fail immediately (non-zero exit) instead of retrying every `settings.lockRetryInterval` seconds |
 
 ### `sources` — print resolved driver configurations
 
@@ -195,7 +199,7 @@ Compares the migrations directory against the state store and lists every migrat
   172530000004.py (applied but file changed)
 ```
 
-Read-only: it takes no lock and executes nothing, so it is safe to run against production at any time — e.g. as a pre-deploy check or to verify a `migrate` run is actually needed. Exits with `All migrations applied.` when directory and state agree.
+Read-only: it takes no lock and executes nothing, so it is safe to run against production at any time — e.g. as a pre-deploy check or to verify a `migrate` run is actually needed. Exits with `All migrations applied.` when directory and state agree. Pass `-i/--ignore-hash` to suppress changed-file reporting, mirroring `migrate -i`.
 
 ## Writing migrations
 
@@ -277,6 +281,8 @@ pytest
 - a full `mobius migrate` end-to-end run with PostgreSQL as state + locker + source and Redpanda as a second source: real migration files executed in child processes, verified by querying the resulting table, topic, state log, and lock table.
 
 Containers are session-scoped; the first run pulls images and takes a few minutes, subsequent runs finish in well under a minute.
+
+CI (`.github/workflows/ci.yml`) runs `pycodestyle`, the unit suite on Python 3.10/3.12/3.13, and the full integration suite (GitHub's Ubuntu runners ship with Docker) on every push to `master` and every pull request.
 
 ## Development
 

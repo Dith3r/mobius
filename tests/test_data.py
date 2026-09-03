@@ -1,4 +1,4 @@
-from mobius.commons.data import chunk, file_md5, reverse_map
+from mobius.commons.data import chunk, file_md5, mask_url_credentials, reverse_map
 
 
 def test_chunk_splits_evenly():
@@ -15,6 +15,18 @@ def test_chunk_empty():
 
 def test_reverse_map():
     assert reverse_map({"a": 1, "b": 2}) == {1: "a", 2: "b"}
+
+
+def test_mask_url_credentials_hides_password():
+    assert (
+        mask_url_credentials("postgresql://app:hunter2@db:5432/app")
+        == "postgresql://app:***@db:5432/app"
+    )
+
+
+def test_mask_url_credentials_leaves_urls_without_password():
+    assert mask_url_credentials("postgresql://db:5432/app") == "postgresql://db:5432/app"
+    assert mask_url_credentials("http://consul:8500") == "http://consul:8500"
 
 
 def test_file_md5(tmp_path):

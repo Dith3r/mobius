@@ -180,6 +180,20 @@ class DriverManager:
         if not isinstance(resolver, IResolver):
             raise ValueError(f"Driver {unresolved.resolver} is not resolver")
         resolved_properties = resolver.resolve(unresolved.properties)
+
+        # fail closed: a property the resolver could not find must abort the
+        # run, never interpolate as the string "None"
+        missing = sorted(
+            f"{key} ({unresolved.properties[key]})"
+            for key, value in resolved_properties.items()
+            if value is None
+        )
+        if missing:
+            raise ValueError(
+                f"Driver `{unresolved.name}`: resolver `{unresolved.resolver}` "
+                f"returned no value for: {', '.join(missing)}"
+            )
+
         config = unresolved.resolve(resolved_properties)
 
         self.configs[unresolved.name] = config

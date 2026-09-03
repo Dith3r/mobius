@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from mobius.commons.mapping import ObjectContext
+from mobius.commons.mapping import InvalidValueError, ObjectContext
 from mobius.drivers.consul.driver import ConsulDriver
 from mobius.drivers.manager import (
     CommonDriverMapper,
@@ -111,8 +111,13 @@ class ConsulConfigDriverMapper(IConfigDriverMapper):
             address = config.get_string(_.ADDRESS)
             token = config.find_string(_.TOKEN).or_none()
             prefix = config.find_string(_.PREFIX).or_else(cls.DEFAULT.PREFIX)
-            connect_timeout = config.find_int(_.CONNECT_TIMEOUT).or_else(
-                cls.DEFAULT.CONNECT_TIMEOUT
+            connect_timeout = (
+                config.find_int(_.CONNECT_TIMEOUT)
+                .must(
+                    InvalidValueError(reason="must be positive"),
+                    lambda value: value > 0,
+                )
+                .or_else(cls.DEFAULT.CONNECT_TIMEOUT)
             )
 
             return config.construct(

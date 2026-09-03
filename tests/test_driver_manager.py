@@ -39,6 +39,11 @@ class NotAResolverDriver(IDriver):
         pass
 
 
+class NoneResolverDriver(FakeResolverDriver):
+    def resolve(self, properties: Dict[str, str]) -> Dict[str, Any]:
+        return {key: None for key in properties}
+
+
 class StubResolvedConfig(DriverResolvedConfig):
     def __init__(self, name, driver=None, resolved_properties=None):
         super().__init__(name, None)
@@ -71,6 +76,18 @@ def test_unresolved_config_is_resolved_through_resolver():
     assert config.resolved_properties == {"user": "resolved-DB_USER"}
     # resolved config replaces the unresolved one
     assert manager.configs["db"] is config
+
+
+def test_unresolvable_property_fails_closed():
+    env = StubResolvedConfig("ENV", driver=NoneResolverDriver())
+    db = StubUnresolvedConfig("db", "ENV", None, {"password": "PG_PASSWORD"})
+    manager = make_manager([env, db])
+
+    with pytest.raises(ValueError) as info:
+        manager.get_config("db")
+
+    assert "password (PG_PASSWORD)" in str(info.value)
+    assert "ENV" in str(info.value)
 
 
 def test_resolver_cannot_resolve_itself():

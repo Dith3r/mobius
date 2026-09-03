@@ -65,3 +65,17 @@ def test_resolve_interpolates_and_quotes_properties():
 def test_driver_implements_state_and_locker_interfaces():
     assert issubclass(PostgresDriver, IStateDriver)
     assert issubclass(PostgresDriver, ILockerDriver)
+
+
+def test_config_str_masks_password():
+    config = PostgresConfigDriverMapper.from_json(
+        "db",
+        {
+            "kind": "POSTGRES",
+            "resolver": None,
+            "config": {"connectionUrl": "postgresql://app:hunter2@db:5432/app"},
+        },
+    )
+
+    assert "hunter2" not in str(config)
+    assert "app:***@" in str(config)

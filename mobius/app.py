@@ -67,9 +67,10 @@ class Bootstrap:
         )
 
         container = Container()
-        container.configure(arguments.config)
 
         try:
+            container.configure(arguments.config)
+
             handler = self.commands[arguments.command](container)
             handler.execute(arguments)
         except Exception:

@@ -1,6 +1,15 @@
 import hashlib
+import re
 from pathlib import Path
 from typing import List, TypeVar
+
+
+URL_PASSWORD = re.compile(r"//([^/:@]+):([^/@]*)@")
+
+
+def mask_url_credentials(url: str) -> str:
+    """Mask the password part of a URL's userinfo for safe logging."""
+    return URL_PASSWORD.sub(r"//\1:***@", url)
 
 
 T = TypeVar("T")

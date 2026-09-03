@@ -4,7 +4,7 @@ from uuid import uuid4
 import pytest
 
 from mobius.commands.migrate import MigrateCommand
-from mobius.commons.locker.model import Lock
+from mobius.commons.locker.model import Lock, LockFailedException
 from mobius.commons.locker.service import Locker
 from mobius.commons.logger.model import Failed, Skipped, Succeed
 from mobius.commons.logger.service import (
@@ -158,7 +158,7 @@ def test_changed_hash_is_tolerated_with_ignore_hash(tmp_path):
     assert logs.logs[100].state is Succeed
 
 
-def test_held_lock_with_no_wait_returns_without_running(tmp_path):
+def test_held_lock_with_no_wait_raises(tmp_path):
     write_migration(tmp_path, 100, MIGRATION_OK)
 
     command, logs, locks = make_command()
@@ -171,7 +171,53 @@ def test_held_lock_with_no_wait_returns_without_running(tmp_path):
         )
     )
 
-    command.execute(str(tmp_path), ignore_hash=False, no_wait=True)
+    # a held lock with --no-wait must be a failure, not a silent exit 0
+    with pytest.raises(LockFailedException):
+        command.execute(str(tmp_path), ignore_hash=False, no_wait=True)
 
     assert logs.logs == {}
     assert not (tmp_path / "100.done").exists()
+
+
+MIGRATION_DIES_SILENTLY = """
+import os
+
+from mobius import Migration
+
+
+class Migration{mid}(Migration):
+    def validate(self):
+        pass
+
+    def execute(self):
+        os._exit(7)  # dies without reporting a result
+
+    def description(self):
+        return "silent death"
+"""
+
+
+def test_child_dying_without_result_is_recorded_as_failed(tmp_path):
+    write_migration(tmp_path, 100, MIGRATION_DIES_SILENTLY)
+
+    command, logs, locks = make_command()
+
+    with pytest.raises(ValueError):
+        command.execute(str(tmp_path), ignore_hash=False, no_wait=True)
+
+    assert logs.logs[100].state is Failed
+    assert "without reporting a result" in logs.logs[100].msg
+    assert "7" in logs.logs[100].msg
+    assert locks.locks == {}
+
+
+def test_non_migration_python_files_are_ignored(tmp_path):
+    write_migration(tmp_path, 100, MIGRATION_OK)
+    (tmp_path / "helpers.py").write_text("raise RuntimeError('never loaded')\n")
+    (tmp_path / "__init__.py").write_text("")
+
+    command, logs, _ = make_command()
+    command.execute(str(tmp_path), ignore_hash=False, no_wait=True)
+
+    assert set(logs.logs) == {100}
+    assert logs.logs[100].state is Succeed

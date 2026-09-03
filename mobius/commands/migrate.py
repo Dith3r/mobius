@@ -3,6 +3,7 @@ import multiprocessing
 from argparse import Namespace
 from multiprocessing import Process
 from os import scandir
+from queue import Empty
 from time import sleep
 from typing import Dict
 from uuid import UUID, uuid4
@@ -18,6 +19,7 @@ from mobius.commons.logger.model import (
     Skipped,
     Succeed,
     filename_to_id,
+    is_migration_filename,
 )
 from mobius.commons.logger.service import Logger
 from mobius.config import MobiusSettings
@@ -106,14 +108,31 @@ class MigrateCommand(Command):
 
                     queue = multiprocessing.Queue()
 
-                    migration_files = [
+                    files = [
                         dir_entry
                         for dir_entry in scandir(directory)
-                        if dir_entry.is_file() and dir_entry.name.endswith(".py")
+                        if dir_entry.is_file()
                     ]
 
+                    ignored = sorted(
+                        dir_entry.name
+                        for dir_entry in files
+                        if dir_entry.name.endswith(".py")
+                        and not is_migration_filename(dir_entry.name)
+                    )
+                    if ignored:
+                        logger.warning(
+                            f"Ignoring python files that are not migrations "
+                            f"(name must be <numeric id>.py): {ignored}"
+                        )
+
                     migration_files = sorted(
-                        migration_files, key=lambda entry: entry.name
+                        (
+                            dir_entry
+                            for dir_entry in files
+                            if is_migration_filename(dir_entry.name)
+                        ),
+                        key=lambda entry: entry.name,
                     )
 
                     for migration_chunk in chunk(migration_files, 100):
@@ -183,7 +202,11 @@ class MigrateCommand(Command):
                             while migration_process.is_alive():
                                 if lock_handle.lost:
                                     migration_process.terminate()
-                                    migration_process.join()
+                                    migration_process.join(10)
+                                    if migration_process.is_alive():
+                                        # blocked in a C call ignoring SIGTERM
+                                        migration_process.kill()
+                                        migration_process.join()
 
                                     migration_log.state = Failed
                                     migration_log.msg = "Lock lost, migration terminated"
@@ -197,7 +220,10 @@ class MigrateCommand(Command):
                                     extra={"details": {"migrationId": migration_id}},
                                 )
 
-                            result = queue.get(block=False)
+                            try:
+                                result = queue.get(timeout=1)
+                            except Empty:
+                                result = None
 
                             if result:
                                 if isinstance(result, SuccessResult):
@@ -211,7 +237,8 @@ class MigrateCommand(Command):
                             else:
                                 migration_log.state = Failed
                                 migration_log.msg = (
-                                    "Process ended with without response on queue"
+                                    "Process ended without reporting a result "
+                                    f"(exit code: {migration_process.exitcode})"
                                 )
 
                             self.logger.update(migration_log)
@@ -220,9 +247,12 @@ class MigrateCommand(Command):
                                 raise ValueError("Cannot continue")
 
             except LockFailedException:
-                logger.info("Acquiring lock failed")
-
                 if no_wait:
-                    retries = False
-                else:
-                    sleep(self.settings.lock_retry_interval)
+                    logger.error(
+                        "Migration lock is held by another runner, "
+                        "aborting (--no-wait)"
+                    )
+                    raise
+
+                logger.info("Acquiring lock failed")
+                sleep(self.settings.lock_retry_interval)

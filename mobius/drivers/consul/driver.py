@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Dict
+from urllib.parse import quote
 
 import httpx
 
@@ -32,7 +33,9 @@ class ConsulDriver(IDriver, IResolver):
         self._client = None
 
     def get(self, name: str) -> str | None:
-        key = self._key(name)
+        # quote so '#', '?' or dot-segments in a key cannot truncate the URL
+        # or escape the /v1/kv/ namespace
+        key = quote(self._key(name), safe="/")
 
         response = self._get_client().get(f"/v1/kv/{key}", params={"raw": "true"})
 

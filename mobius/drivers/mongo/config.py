@@ -5,6 +5,7 @@ from urllib.parse import quote_plus
 
 from pymongo import MongoClient
 
+from mobius.commons.data import mask_url_credentials
 from mobius.commons.mapping import InvalidValueError, ObjectContext
 from mobius.drivers.manager import (
     CommonDriverMapper,
@@ -29,7 +30,8 @@ class MongoConfigDriver(IDriverConfig):
         self.max_pool = max_pool
 
     def __str__(self):
-        return f"{self.__class__.__name__}[connection_url={self.connection_url}, uuid={self.uuid}, max_pool={self.max_pool}]"
+        url = mask_url_credentials(self.connection_url) if self.connection_url else None
+        return f"{self.__class__.__name__}[connection_url={url}, uuid={self.uuid}, max_pool={self.max_pool}]"
 
 
 class MongoResolvedConfigDriver(DriverResolvedConfig):
@@ -107,7 +109,8 @@ class MongoConfigDriverMapper(IConfigDriverMapper):
             connection_url = config.get_string(_.CONNECTION_URL)
             uuid = config.find_string(_.UUID).or_else(cls.DEFAULT.UUID)
             max_pool_size = (
-                config.find_int(_.MAX_POOL_SIZE)
+                # lenient: pre-mapping-refactor configs stored numbers as strings
+                config.find_lenient_int(_.MAX_POOL_SIZE)
                 .must(
                     InvalidValueError(reason="must be positive"),
                     lambda value: value > 0,

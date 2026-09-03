@@ -86,6 +86,34 @@ def test_server_error_raises():
         driver.get("key")
 
 
+def test_key_is_url_quoted():
+    seen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["raw_path"] = request.url.raw_path.decode()
+        return httpx.Response(200, text="value")
+
+    config = ConsulConfigDriver("http://consul.local:8500", None, "app", 5)
+    driver = ConsulDriver("consul", config, transport=httpx.MockTransport(handler))
+
+    assert driver.get("we#ird key") == "value"
+    assert "/v1/kv/app/we%23ird%20key" in seen["raw_path"]
+
+
+def test_mapper_rejects_non_positive_timeout():
+    from mobius.commons.mapping import MappingException
+
+    with pytest.raises(MappingException):
+        ConsulConfigDriverMapper.from_json(
+            "consul",
+            {
+                "kind": "CONSUL",
+                "resolver": None,
+                "config": {"address": "http://consul.local:8500", "connectTimeout": 0},
+            },
+        )
+
+
 def test_config_str_does_not_leak_token():
     config = ConsulConfigDriver("http://consul.local:8500", "secret-token", "", 5)
 
