@@ -5,6 +5,7 @@ import pytest
 from mobius.commons.driver import IDriver
 from mobius.commons.logger.service import IStateDriver
 from mobius.commons.resolver import IResolver
+from mobius.commons.mapping import MappingException
 from mobius.config import MobiusJsonMapper, MobiusSettings, MobiusSettingsJsonMapper
 from mobius.drivers.manager import (
     DriverJsonMapper,
@@ -137,7 +138,7 @@ class StubMapper(IConfigDriverMapper):
     KIND = IDriverConfig
 
     @classmethod
-    def from_json(cls, name: str, data: dict) -> IDriverConfig:
+    def from_context(cls, name, context):
         return StubResolvedConfig(name)
 
 
@@ -162,8 +163,19 @@ def test_json_mapper_rejects_duplicate_kind():
 def test_json_mapper_rejects_non_object():
     mapper = DriverJsonMapper()
 
-    with pytest.raises(RuntimeError):
+    with pytest.raises(MappingException):
         mapper.from_json("db", "not-a-dict")
+
+
+def test_json_mapper_reports_unknown_kind_with_segment():
+    mapper = DriverJsonMapper()
+    mapper.register(StubMapper)
+
+    with pytest.raises(MappingException) as info:
+        mapper.from_json("db", {"kind": "NOPE"})
+
+    (segment,) = info.value.errors
+    assert str(segment) == "$.kind"
 
 
 def test_mobius_json_mapper_maps_full_config():
@@ -215,13 +227,39 @@ def test_settings_partial_block_keeps_defaults():
     [{"lockTtl": 0}, {"lockTtl": -5}, {"lockRetryInterval": 0}],
 )
 def test_settings_reject_non_positive_values(raw):
-    with pytest.raises(ValueError):
+    with pytest.raises(MappingException):
         MobiusSettingsJsonMapper.from_json(raw)
 
 
 def test_settings_reject_non_object():
-    with pytest.raises(RuntimeError):
+    with pytest.raises(MappingException):
         MobiusSettingsJsonMapper.from_json("not-a-dict")
+
+
+def test_mobius_json_mapper_accumulates_errors_across_drivers():
+    mapper = DriverJsonMapper()
+    mapper.register(StubMapper)
+
+    raw = {
+        "state": {"kind": "FAKE"},
+        "locker": {},  # missing kind
+        "sources": {
+            "db": {"kind": "UNKNOWN"},
+            "queue": "not-an-object",
+        },
+        "settings": {"lockTtl": -1},
+    }
+
+    with pytest.raises(MappingException) as info:
+        MobiusJsonMapper.from_json(raw, mapper)
+
+    segments = {str(segment) for segment in info.value.errors}
+    assert segments == {
+        "$.locker.kind",
+        "$.sources.db.kind",
+        "$.sources.queue",
+        "$.settings.lockTtl",
+    }
 
 
 def test_settings_defaults():

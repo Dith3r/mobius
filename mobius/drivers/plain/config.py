@@ -1,5 +1,8 @@
-from typing import Any, Optional
+from __future__ import annotations
 
+from typing import Any
+
+from mobius.commons.mapping import ObjectContext
 from mobius.drivers.manager import (
     CommonDriverMapper,
     DriverResolvedConfig,
@@ -13,7 +16,7 @@ class PlainConfig(IDriverConfig):
     def __init__(self, data: dict):
         self.data = data
 
-    def get(self, key: str) -> Optional[Any]:
+    def get(self, key: str) -> Any | None:
         return self.data.get(key)
 
     def __str__(self):
@@ -27,7 +30,7 @@ class PlainResolvedConfigDriver(DriverResolvedConfig):
     def initialize(self):
         return PlainDriver(self)
 
-    def get(self, key: str) -> Optional[Any]:
+    def get(self, key: str) -> Any | None:
         return self.config.get(key)
 
     def __str__(self):
@@ -45,12 +48,13 @@ class PlainConfigDriverMapper(IConfigDriverMapper):
         __slots__ = ()
 
     @classmethod
-    def from_json(cls, name: str, data: dict) -> PlainResolvedConfigDriver:
+    def from_context(
+        cls, name: str, context: ObjectContext
+    ) -> PlainResolvedConfigDriver | None:
         _ = cls.FIELDS
 
-        config = data.get(_.CONFIG, {})
+        config = context.find_raw_object(_.CONFIG).or_else({})
 
-        if not isinstance(config, dict):
-            raise RuntimeError("Invalid config for driver %s", name)
-
-        return PlainResolvedConfigDriver(name, PlainConfig(config))
+        return context.construct(
+            lambda: PlainResolvedConfigDriver(name, PlainConfig(config))
+        )

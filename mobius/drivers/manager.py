@@ -1,8 +1,11 @@
-from typing import Any, Dict, Iterable, Optional, Set, Type
+from __future__ import annotations
+
+from typing import Any, Dict, Iterable, Set, Type
 
 from mobius.commons.driver import IDriver
 from mobius.commons.locker.service import ILockerDriver
 from mobius.commons.logger.service import IStateDriver
+from mobius.commons.mapping import InvalidValueError, ObjectContext, map_object
 from mobius.commons.resolver import IResolver
 
 
@@ -57,8 +60,12 @@ class IConfigDriverMapper:
     JSON_KIND: str
 
     @classmethod
-    def from_json(cls, name: str, data: dict) -> IDriverConfig:
+    def from_context(cls, name: str, context: ObjectContext) -> IDriverConfig | None:
         raise NotImplementedError
+
+    @classmethod
+    def from_json(cls, name: str, data: Any) -> IDriverConfig:
+        return map_object(data, lambda context: cls.from_context(name, context))
 
 
 class CommonDriverMapper:
@@ -88,17 +95,27 @@ class DriverJsonMapper:
         self.all.add(mapper)
         self._from_json[mapper.JSON_KIND] = mapper
 
-    def from_json(self, name: str, data: Any) -> IDriverConfig:
+    def from_context(
+        self, name: str, context: ObjectContext
+    ) -> IDriverConfig | None:
         _ = CommonDriverMapper.Fields
 
-        if not isinstance(data, dict):
-            raise RuntimeError("Driver configuration is not a JsonObject")
+        kind = context.get_string(_.KIND).or_none()
+        if kind is None:
+            return None
 
-        kind = data[_.KIND]
+        mapper = self._from_json.get(kind)
+        if mapper is None:
+            context.report(
+                InvalidValueError(kind=kind, known=sorted(self._from_json)),
+                field=_.KIND,
+            )
+            return None
 
-        mapper = self._from_json[kind]
+        return mapper.from_context(name, context)
 
-        return mapper.from_json(name, data)
+    def from_json(self, name: str, data: Any) -> IDriverConfig:
+        return map_object(data, lambda context: self.from_context(name, context))
 
 
 class DriverManager:
@@ -106,10 +123,10 @@ class DriverManager:
     configs: Dict[str, IDriverConfig]
 
     locker_config: IDriverConfig
-    locker_driver: Optional[ILockerDriver]
+    locker_driver: ILockerDriver | None
 
     state_config: IDriverConfig
-    state_driver: Optional[IStateDriver]
+    state_driver: IStateDriver | None
 
     def __init__(
         self,

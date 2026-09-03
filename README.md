@@ -169,9 +169,22 @@ mobius -c config.json sources
 
 Resolves and prints every configured driver — useful to verify a deployment's configuration and environment wiring.
 
-### `difference`
+### `difference` — show migrations not yet applied
 
-Placeholder — not implemented yet.
+```bash
+mobius -c config.json difference -d ./migrations
+```
+
+Compares the migrations directory against the state store and lists every migration that has not been (successfully) applied, with the reason:
+
+```
+3 migration(s) not applied:
+  172530000002.py (state: Failed)
+  172530000003.py (never run)
+  172530000004.py (applied but file changed)
+```
+
+Read-only: it takes no lock and executes nothing, so it is safe to run against production at any time — e.g. as a pre-deploy check or to verify a `migrate` run is actually needed. Exits with `All migrations applied.` when directory and state agree.
 
 ## Writing migrations
 
@@ -262,7 +275,7 @@ mobius/
 ├── app.py                  # CLI bootstrap: argparse, logging, command dispatch
 ├── config.py               # top-level config.json mapping
 ├── container.py            # dependency wiring (drivers, services, commands)
-├── commands/               # CLI commands: generate, migrate, sources
+├── commands/               # CLI commands: generate, migrate, difference, sources
 ├── commons/
 │   ├── locker/             # Locker service (lock ctx manager, heartbeat, LockHandle)
 │   ├── logger/             # state log service, Log model, states
@@ -285,7 +298,7 @@ mobius/
 ### Adding a source driver
 
 1. Create `mobius/drivers/<name>/driver.py` implementing `IDriver` (`connection()` returns whatever migrations should receive; `close()` releases it).
-2. Create `mobius/drivers/<name>/config.py` with three classes: a plain config holder, a `DriverResolvedConfig` subclass whose `initialize()` builds the driver, and a `DriverUnresolvedConfig` subclass whose `resolve(properties)` interpolates resolver output (`%(key)s`) and returns the resolved variant. Add an `IConfigDriverMapper` with a unique `JSON_KIND` mapping the JSON shape.
+2. Create `mobius/drivers/<name>/config.py` with three classes: a plain config holder, a `DriverResolvedConfig` subclass whose `initialize()` builds the driver, and a `DriverUnresolvedConfig` subclass whose `resolve(properties)` interpolates resolver output (`%(key)s`) and returns the resolved variant. Add an `IConfigDriverMapper` with a unique `JSON_KIND` and implement `from_context(name, context)` using the typed accessors from `mobius/commons/mapping.py` (`get_*` for required fields, `find_*` for optional ones, `construct()` to build the config).
 3. Register the mapper in `Container.driver_json_mapper` (`mobius/container.py`).
 4. Add the client library to `requirements.txt` and, ideally, an integration test under `tests/integration/`.
 
@@ -294,10 +307,10 @@ To make a driver usable as **state** or **locker**, additionally implement `ISta
 ### Conventions
 
 - Mapping between wire formats and models lives in dedicated `*Mapper` classes with a `Fields` inner class naming the raw keys — no stringly-typed keys inline.
+- Config parsing is **error-accumulating** (`mobius/commons/mapping.py`): one `ErrorSink` is shared across the whole parse, every problem is reported with its full segment (`$.sources.db.connectionUrl: VALIDATION.INVALID_TYPE(type=Str)`), and a broken config surfaces *all* its mistakes in one `MappingException` instead of one `KeyError` at a time.
 - Storage access goes through repository interfaces (`commons/*/repository.py`); services (`Locker`, `Logger`) never touch a client directly, which is what keeps them testable with the fakes in `tests/fakes.py`.
 - Logs are structured JSON (one object per line) — suitable for log collectors out of the box.
 
 ### Known gaps
 
-- `difference` command is a stub.
 - No CLI for resolving stuck `Failed`/`InProgress` state entries (manual state-storage edit required).

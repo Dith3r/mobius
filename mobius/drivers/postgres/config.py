@@ -1,6 +1,9 @@
-from typing import Any, Dict, Optional
+from __future__ import annotations
+
+from typing import Any, Dict
 from urllib.parse import quote_plus
 
+from mobius.commons.mapping import InvalidValueError, ObjectContext
 from mobius.drivers.manager import (
     CommonDriverMapper,
     DriverResolvedConfig,
@@ -12,13 +15,13 @@ from mobius.drivers.postgres.driver import PostgresDriver
 
 
 class PostgresConfigDriver(IDriverConfig):
-    connection_url: Optional[str]
+    connection_url: str | None
     connect_timeout: int
     autocommit: bool
 
     def __init__(
         self,
-        connection_url: Optional[str],
+        connection_url: str | None,
         connect_timeout: int,
         autocommit: bool,
     ):
@@ -94,30 +97,41 @@ class PostgresConfigDriverMapper(IConfigDriverMapper):
         AUTOCOMMIT = "autocommit"
 
     @classmethod
-    def from_json(cls, name: str, data: dict) -> IDriverConfig:
+    def from_context(
+        cls, name: str, context: ObjectContext
+    ) -> IDriverConfig | None:
         _ = cls.FIELDS
 
-        resolver = data[_.RESOLVER]
-        config = data.get(_.CONFIG, {})
-        properties = data.get(_.PROPERTIES, {})
+        resolver = context.find_string(_.RESOLVER).or_none()
+        properties = context.find_string_map(_.PROPERTIES).or_else({})
 
-        if not isinstance(config, dict):
-            raise RuntimeError("Invalid config for driver %s", name)
+        def read_config(config: ObjectContext) -> PostgresConfigDriver | None:
+            connection_url = config.get_string(_.CONNECTION_URL)
+            connect_timeout = (
+                config.find_int(_.CONNECT_TIMEOUT)
+                .must(
+                    InvalidValueError(reason="must be positive"),
+                    lambda value: value > 0,
+                )
+                .or_else(cls.DEFAULT.CONNECT_TIMEOUT)
+            )
+            autocommit = config.find_bool(_.AUTOCOMMIT).or_else(
+                cls.DEFAULT.AUTOCOMMIT
+            )
 
-        if not isinstance(properties, dict):
-            raise RuntimeError("Invalid properties for driver %s", name)
+            return config.construct(
+                lambda: PostgresConfigDriver(
+                    connection_url.require(), connect_timeout, autocommit
+                )
+            )
 
-        connection_url = config.get(_.CONNECTION_URL)
-        connect_timeout = int(config.get(_.CONNECT_TIMEOUT, cls.DEFAULT.CONNECT_TIMEOUT))
-        autocommit = bool(config.get(_.AUTOCOMMIT, cls.DEFAULT.AUTOCOMMIT))
-
-        postgres_config = PostgresConfigDriver(
-            connection_url, connect_timeout, autocommit
-        )
+        postgres_config = context.get_object(_.CONFIG, read_config).or_none()
+        if postgres_config is None:
+            return None
 
         if resolver:
             return PostgresUnresolvedConfigDriver(
                 name, resolver, postgres_config, properties
             )
-        else:
-            return PostgresResolvedConfigDriver(name, postgres_config)
+
+        return PostgresResolvedConfigDriver(name, postgres_config)

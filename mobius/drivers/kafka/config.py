@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 from typing import Any, Dict
 
+from mobius.commons.mapping import ObjectContext
 from mobius.drivers.kafka.driver import KafkaDriver
 from mobius.drivers.manager import (
     CommonDriverMapper,
@@ -60,27 +63,26 @@ class KafkaConfigDriverMapper(IConfigDriverMapper):
         BOOTSTRAP_SERVERS = "bootstrapServers"
 
     @classmethod
-    def from_json(cls, name: str, data: dict) -> IDriverConfig:
+    def from_context(
+        cls, name: str, context: ObjectContext
+    ) -> IDriverConfig | None:
         _ = cls.FIELDS
 
-        resolver = data[_.RESOLVER]
-        config = data.get(_.CONFIG, {})
-        properties = data.get(_.PROPERTIES, {})
+        resolver = context.find_string(_.RESOLVER).or_none()
+        properties = context.find_string_map(_.PROPERTIES).or_else({})
 
-        if not isinstance(config, dict):
-            raise RuntimeError("Invalid config for driver %s", name)
+        def read_config(config: ObjectContext) -> KafkaConfigDriver | None:
+            bootstrap_servers = config.get_string(_.BOOTSTRAP_SERVERS)
 
-        if not isinstance(properties, dict):
-            raise RuntimeError("Invalid properties for driver %s", name)
+            return config.construct(
+                lambda: KafkaConfigDriver(bootstrap_servers.require())
+            )
 
-        bootstrap_servers = config.get(_.BOOTSTRAP_SERVERS)
+        kafka_config = context.get_object(_.CONFIG, read_config).or_none()
+        if kafka_config is None:
+            return None
 
         if resolver:
-            return KafkaUnresolvedConfigDriver(
-                name,
-                resolver,
-                KafkaConfigDriver(bootstrap_servers),
-                properties,
-            )
-        else:
-            return KafkaResolvedConfigDriver(name, KafkaConfigDriver(bootstrap_servers))
+            return KafkaUnresolvedConfigDriver(name, resolver, kafka_config, properties)
+
+        return KafkaResolvedConfigDriver(name, kafka_config)

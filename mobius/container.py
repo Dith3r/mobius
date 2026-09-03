@@ -1,5 +1,6 @@
 from io import TextIOWrapper
 
+from mobius.commands.difference import DifferenceCommand
 from mobius.commands.generate import GenerateCommand
 from mobius.commands.migrate import MigrateCommand
 from mobius.commons.container import cached_property
@@ -24,6 +25,10 @@ class CommandsContainer:
     @cached_property
     def generate(self) -> GenerateCommand:
         return GenerateCommand()
+
+    @cached_property
+    def difference(self) -> DifferenceCommand:
+        return DifferenceCommand(self.container.logger)
 
     @cached_property
     def migrate(self) -> MigrateCommand:

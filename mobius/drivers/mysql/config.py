@@ -1,5 +1,8 @@
-from typing import Any, Dict, Optional
+from __future__ import annotations
 
+from typing import Any, Dict
+
+from mobius.commons.mapping import InvalidValueError, ObjectContext
 from mobius.drivers.manager import (
     CommonDriverMapper,
     DriverResolvedConfig,
@@ -11,20 +14,20 @@ from mobius.drivers.mysql.driver import MySqlDriver
 
 
 class MysqlConfigDriver(IDriverConfig):
-    host: Optional[str]
+    host: str | None
     port: int
-    database: Optional[str]
-    user: Optional[str]
-    password: Optional[str]
+    database: str | None
+    user: str | None
+    password: str | None
     connect_timeout: int
 
     def __init__(
         self,
-        host: Optional[str],
+        host: str | None,
         port: int,
-        database: Optional[str],
-        user: Optional[str],
-        password: Optional[str],
+        database: str | None,
+        user: str | None,
+        password: str | None,
         connect_timeout: int,
     ):
         self.host = host
@@ -67,7 +70,7 @@ class MysqlUnresolvedConfigDriver(DriverUnresolvedConfig):
         super().__init__(name, resolver, config, properties)
 
     def resolve(self, resolved_properties: Dict[str, Any]) -> DriverResolvedConfig:
-        def interpolate(value: Optional[str]) -> Optional[str]:
+        def interpolate(value: str | None) -> str | None:
             if value is None:
                 return None
             return value % resolved_properties
@@ -104,31 +107,40 @@ class MySqlConfigDriverMapper(IConfigDriverMapper):
         CONNECT_TIMEOUT = "connectTimeout"
 
     @classmethod
-    def from_json(cls, name: str, data: dict) -> IDriverConfig:
+    def from_context(
+        cls, name: str, context: ObjectContext
+    ) -> IDriverConfig | None:
         _ = cls.FIELDS
 
-        resolver = data[_.RESOLVER]
-        config = data.get(_.CONFIG, {})
-        properties = data.get(_.PROPERTIES, {})
+        resolver = context.find_string(_.RESOLVER).or_none()
+        properties = context.find_string_map(_.PROPERTIES).or_else({})
 
-        if not isinstance(config, dict):
-            raise RuntimeError("Invalid config for driver %s", name)
+        def read_config(config: ObjectContext) -> MysqlConfigDriver | None:
+            host = config.get_string(_.HOST)
+            port = config.find_int(_.PORT).or_else(cls.DEFAULT.PORT)
+            database = config.find_string(_.DATABASE).or_none()
+            user = config.find_string(_.USER).or_none()
+            password = config.find_string(_.PASSWORD).or_none()
+            connect_timeout = (
+                config.find_int(_.CONNECT_TIMEOUT)
+                .must(
+                    InvalidValueError(reason="must be positive"),
+                    lambda value: value > 0,
+                )
+                .or_else(cls.DEFAULT.CONNECT_TIMEOUT)
+            )
 
-        if not isinstance(properties, dict):
-            raise RuntimeError("Invalid properties for driver %s", name)
+            return config.construct(
+                lambda: MysqlConfigDriver(
+                    host.require(), port, database, user, password, connect_timeout
+                )
+            )
 
-        mysql_config = MysqlConfigDriver(
-            host=config.get(_.HOST),
-            port=config.get(_.PORT, cls.DEFAULT.PORT),
-            database=config.get(_.DATABASE),
-            user=config.get(_.USER),
-            password=config.get(_.PASSWORD),
-            connect_timeout=int(
-                config.get(_.CONNECT_TIMEOUT, cls.DEFAULT.CONNECT_TIMEOUT)
-            ),
-        )
+        mysql_config = context.get_object(_.CONFIG, read_config).or_none()
+        if mysql_config is None:
+            return None
 
         if resolver:
             return MysqlUnresolvedConfigDriver(name, resolver, mysql_config, properties)
-        else:
-            return MysqlResolvedConfigDriver(name, mysql_config)
+
+        return MysqlResolvedConfigDriver(name, mysql_config)

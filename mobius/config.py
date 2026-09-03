@@ -1,7 +1,14 @@
+from __future__ import annotations
+
 import json
 from io import TextIOWrapper
 from typing import Dict
 
+from mobius.commons.mapping import (
+    InvalidValueError,
+    ObjectContext,
+    map_object,
+)
 from mobius.drivers.manager import DriverJsonMapper, IDriverConfig
 
 
@@ -58,20 +65,31 @@ class MobiusSettingsJsonMapper:
         LOCK_RETRY_INTERVAL = "lockRetryInterval"
 
     @classmethod
-    def from_json(cls, raw_json: dict) -> MobiusSettings:
+    def from_context(cls, context: ObjectContext) -> MobiusSettings | None:
         _ = cls.Fields
-
-        if not isinstance(raw_json, dict):
-            raise RuntimeError("Settings configuration is not a JsonObject")
-
         defaults = MobiusSettings()
 
-        return MobiusSettings(
-            lock_ttl=int(raw_json.get(_.LOCK_TTL, defaults.lock_ttl)),
-            lock_retry_interval=float(
-                raw_json.get(_.LOCK_RETRY_INTERVAL, defaults.lock_retry_interval)
-            ),
+        positive = InvalidValueError(reason="must be positive")
+
+        lock_ttl = (
+            context.find_int(_.LOCK_TTL)
+            .must(positive, lambda value: value > 0)
+            .or_else(defaults.lock_ttl)
         )
+
+        lock_retry_interval = (
+            context.find_float(_.LOCK_RETRY_INTERVAL)
+            .must(positive, lambda value: value > 0)
+            .or_else(defaults.lock_retry_interval)
+        )
+
+        return context.construct(
+            lambda: MobiusSettings(lock_ttl, lock_retry_interval)
+        )
+
+    @classmethod
+    def from_json(cls, raw_json) -> MobiusSettings:
+        return map_object(raw_json, cls.from_context)
 
 
 class MobiusJsonMapper:
@@ -90,22 +108,37 @@ class MobiusJsonMapper:
     ) -> MobiusConfig:
         _ = cls.Fields
 
-        state = raw_json[_.STATE]
-        locker = raw_json[_.LOCKER]
-        sources = raw_json[_.SOURCES]
+        def read(context: ObjectContext) -> MobiusConfig | None:
+            state = context.get_object(
+                _.STATE, lambda c: driver_config_mapper.from_context("state", c)
+            )
+            locker = context.get_object(
+                _.LOCKER, lambda c: driver_config_mapper.from_context("locker", c)
+            )
 
-        locker_config = driver_config_mapper.from_json("locker", locker)
+            def read_sources(
+                sources: ObjectContext,
+            ) -> Dict[str, IDriverConfig | None]:
+                return {
+                    name: sources.get_object(
+                        name, lambda c: driver_config_mapper.from_context(name, c)
+                    ).or_none()
+                    for name in sources.node
+                }
 
-        state_config = driver_config_mapper.from_json("state", state)
+            sources = context.get_object(_.SOURCES, read_sources)
 
-        sources = {
-            name: driver_config_mapper.from_json(name, driver_config)
-            for name, driver_config in sources.items()
-        }
+            settings = context.find_object(
+                _.SETTINGS, MobiusSettingsJsonMapper.from_context
+            ).or_else(MobiusSettings())
 
-        settings = MobiusSettingsJsonMapper.from_json(raw_json.get(_.SETTINGS, {}))
+            return context.construct(
+                lambda: MobiusConfig(
+                    state.require(), locker.require(), sources.require(), settings
+                )
+            )
 
-        return MobiusConfig(state_config, locker_config, sources, settings)
+        return map_object(raw_json, read)
 
 
 class MobiusFileMapper:

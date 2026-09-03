@@ -1,5 +1,8 @@
-from typing import Any, Dict, Optional
+from __future__ import annotations
 
+from typing import Any, Dict
+
+from mobius.commons.mapping import ObjectContext
 from mobius.drivers.environment.diver import EnvironmentDriver
 from mobius.drivers.manager import (
     CommonDriverMapper,
@@ -11,11 +14,11 @@ from mobius.drivers.manager import (
 
 
 class EnvironmentConfigDriver(IDriverConfig):
-    prefix: Optional[str]
-    sufix: Optional[str]
+    prefix: str | None
+    sufix: str | None
     separator: str
 
-    def __init__(self, prefix: Optional[str], sufix: Optional[str], separator="_"):
+    def __init__(self, prefix: str | None, sufix: str | None, separator="_"):
         self.prefix = prefix
         self.sufix = sufix
         self.separator = separator
@@ -68,36 +71,27 @@ class EnvironmentConfigDriverMapper(IConfigDriverMapper):
         SUFIX = "sufix"
 
     @classmethod
-    def from_json(cls, name: str, data: dict) -> IDriverConfig:
+    def from_context(
+        cls, name: str, context: ObjectContext
+    ) -> IDriverConfig | None:
         _ = cls.FIELDS
 
-        resolver = data[_.RESOLVER]
-        config = data.get(_.CONFIG, {})
-        properties = data.get(_.PROPERTIES, {})
+        resolver = context.find_string(_.RESOLVER).or_none()
+        properties = context.find_string_map(_.PROPERTIES).or_else({})
 
-        if not isinstance(config, dict):
-            raise RuntimeError("Invalid config for driver %s", name)
+        def read_config(config: ObjectContext) -> EnvironmentConfigDriver | None:
+            prefix = config.find_string(_.PREFIX).or_else(cls.DEFAULT.PREFIX)
+            sufix = config.find_string(_.SUFIX).or_else(cls.DEFAULT.SUFIX)
 
-        if not isinstance(properties, dict):
-            raise RuntimeError("Invalid properties for driver %s", name)
+            return config.construct(lambda: EnvironmentConfigDriver(prefix, sufix))
 
-        prefix = config.get(_.PREFIX)
-        if prefix is None:
-            prefix = cls.DEFAULT.PREFIX
-        else:
-            prefix = str(prefix)
-
-        sufix = config.get(_.SUFIX)
-        if sufix is None:
-            sufix = cls.DEFAULT.SUFIX
-        else:
-            sufix = str(sufix)
+        env_config = context.find_object(_.CONFIG, read_config).or_else(
+            EnvironmentConfigDriver(cls.DEFAULT.PREFIX, cls.DEFAULT.SUFIX)
+        )
 
         if resolver:
             return EnvironmentUnresolvedConfigDriver(
-                name, resolver, EnvironmentConfigDriver(prefix, sufix), properties
+                name, resolver, env_config, properties
             )
-        else:
-            return EnvironmentResolvedConfigDriver(
-                name, EnvironmentConfigDriver(prefix, sufix)
-            )
+
+        return EnvironmentResolvedConfigDriver(name, env_config)

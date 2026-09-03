@@ -3,7 +3,7 @@ import sys
 from argparse import ArgumentParser, FileType
 from typing import Dict, Type
 
-from mobius.commands.dummy import DummyHandler
+from mobius.commands.difference import DifferenceHandler
 from mobius.commands.generate import GenerateHandler
 from mobius.commands.migrate import MigrateHandler
 from mobius.commands.sources import SourcesHandler
@@ -21,7 +21,7 @@ class Bootstrap:
     commands: Dict[str, Type[Handler]] = {
         "generate": GenerateHandler,
         "migrate": MigrateHandler,
-        "difference": DummyHandler,
+        "difference": DifferenceHandler,
         "sources": SourcesHandler,
     }
 
