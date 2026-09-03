@@ -9,6 +9,7 @@ from mobius.commons.locker.service import Locker
 from mobius.commons.logger.repository import LogsRepository
 from mobius.commons.logger.service import Logger
 from mobius.config import MobiusConfig, MobiusFileMapper
+from mobius.drivers.consul.config import ConsulConfigDriverMapper
 from mobius.drivers.environment.config import EnvironmentConfigDriverMapper
 from mobius.drivers.kafka.config import KafkaConfigDriverMapper
 from mobius.drivers.manager import DriverJsonMapper, DriverManager
@@ -64,6 +65,7 @@ class Container:
         driver_mapper.register(MySqlConfigDriverMapper)
         driver_mapper.register(KafkaConfigDriverMapper)
         driver_mapper.register(PostgresConfigDriverMapper)
+        driver_mapper.register(ConsulConfigDriverMapper)
 
         return driver_mapper
 

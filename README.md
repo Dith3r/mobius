@@ -19,8 +19,8 @@ Mobius fills that gap:
 
 ```
                         ┌───────────────┐
-   config.json ───────► │ DriverManager │ ◄── resolvers (ENV, PLAIN) inject
-                        └──────┬────────┘     credentials at runtime
+   config.json ───────► │ DriverManager │ ◄── resolvers (ENV, CONSUL, PLAIN)
+                        └──────┬────────┘     inject credentials at runtime
                                │
         ┌──────────────┬───────┴────────┬─────────────────┐
         ▼              ▼                ▼                 ▼
@@ -48,7 +48,7 @@ A `mobius migrate` run:
 |---|---|---|
 | `state` | The log of executed migrations (id, md5 hash, state, message, timestamps) | `MONGO`, `POSTGRES`, `MYSQL` |
 | `locker` | The distributed lock that serializes runners | `MONGO`, `POSTGRES`, `MYSQL` |
-| `sources` | Named connections handed to migrations | `MONGO`, `POSTGRES`, `MYSQL`, `KAFKA`, `ENV`, `PLAIN` |
+| `sources` | Named connections handed to migrations | `MONGO`, `POSTGRES`, `MYSQL`, `KAFKA`, `ENV`, `CONSUL`, `PLAIN` |
 
 State and locker may live in the same database or in two different ones — they are configured independently.
 
@@ -66,7 +66,7 @@ State and locker may live in the same database or in two different ones — they
 pip install .        # installs the `mobius` console script
 ```
 
-Requires Python ≥ 3.10. Storage drivers used at runtime come from `requirements.txt` (`pymongo`, `psycopg`, `PyMySQL`, `confluent-kafka`).
+Requires Python ≥ 3.10. Storage drivers used at runtime come from `requirements.txt` (`pymongo`, `psycopg`, `PyMySQL`, `confluent-kafka`, `httpx`).
 
 ## Configuration
 
@@ -117,7 +117,7 @@ Every driver config has the same shape:
 
 ### Resolvers: keeping secrets out of the file
 
-A config with `"resolver": "<source name>"` is *unresolved* until runtime. The named resolver source (typically the built-in `ENV` driver) looks up each entry in `properties` — for `ENV`, the values are **environment variable names** — and the results are substituted into `config` using `%(key)s` placeholders. Values interpolated into connection URLs are URL-quoted automatically.
+A config with `"resolver": "<source name>"` is *unresolved* until runtime. The named resolver source looks up each entry in `properties` — for `ENV`, the values are **environment variable names**; for `CONSUL`, they are **KV keys** — and the results are substituted into `config` using `%(key)s` placeholders. Values interpolated into connection URLs are URL-quoted automatically. Resolvers chain: a `CONSUL` resolver's own address and ACL token can themselves be resolved from `ENV`.
 
 This means `config.json` is safe to commit: it contains variable *names*, never credentials.
 
@@ -126,6 +126,17 @@ This means `config.json` is safe to commit: it contains variable *names*, never 
 **`ENV`** — resolver that reads environment variables. Optional `config`: `prefix`, `sufix`, `separator` (default `_`) to namespace lookups (`PRE_<NAME>_POST`).
 
 **`PLAIN`** — resolver that returns the property values as-is (useful for non-secret templating and tests).
+
+**`CONSUL`** — resolver that reads values from a [Consul](https://www.consul.io/) KV store over its HTTP API. `config`: `address` (required, e.g. `http://consul.service:8500`), `token` (optional ACL token, sent as `X-Consul-Token`, never logged), `prefix` (optional KV path prefix, joined with `/`), `connectTimeout` (default `10`). Property values are KV keys relative to the prefix:
+
+```json
+"consul": {
+  "kind": "CONSUL",
+  "resolver": "ENV",
+  "properties": { "token": "CONSUL_HTTP_TOKEN" },
+  "config": { "address": "http://consul.service:8500", "token": "%(token)s", "prefix": "app/prod" }
+}
+```
 
 **`MONGO`** — usable as state, locker, and source. `config`: `connectionUrl` (required), `uuid` (default `"standard"`), `maxPoolSize` (default `10`). As a source, migrations receive a `pymongo.MongoClient`.
 
@@ -222,7 +233,7 @@ class Migration172535000000(Migration):
             pg.execute("ALTER TABLE people ADD COLUMN email text")
             pg.commit()
 
-        with self.manager.get("nbeo") as mongo:       # MongoClient
+        with self.manager.get("mongodb") as mongo:       # MongoClient
             mongo.get_default_database().people.update_many({}, {"$set": {"v": 2}})
 
     def description(self):
@@ -261,6 +272,7 @@ pytest
 - `postgres:16-alpine` — lock acquisition, expired-lock takeover, heartbeat updates, and the full logs repository against real PostgreSQL;
 - `mongo:7` — the same repository contracts against real MongoDB;
 - `mysql:8.4` — the same repository contracts (including expired-lock takeover) against real MySQL;
+- `hashicorp/consul` — KV lookups and a full resolver chain (Consul resolving a PostgreSQL config through the `DriverManager`);
 - **Redpanda** (Kafka-compatible, no ZooKeeper/JVM — used instead of a Kafka container) — the Kafka driver;
 - a full `mobius migrate` end-to-end run with PostgreSQL as state + locker + source and Redpanda as a second source: real migration files executed in child processes, verified by querying the resulting table, topic, state log, and lock table.
 
@@ -285,6 +297,7 @@ mobius/
 ├── drivers/
 │   ├── manager.py          # DriverManager + config mapper registry
 │   ├── environment/        # ENV resolver
+│   ├── consul/             # Consul KV resolver
 │   ├── plain/              # PLAIN resolver
 │   ├── mongo/              # Mongo driver + locks/logs repositories
 │   ├── postgres/           # Postgres driver + locks/logs repositories

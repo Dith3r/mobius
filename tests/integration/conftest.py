@@ -64,6 +64,25 @@ def mysql_config():
 
 
 @pytest.fixture(scope="session")
+def consul_address():
+    from testcontainers.core.container import DockerContainer
+    from testcontainers.core.waiting_utils import wait_for_logs
+
+    container = (
+        DockerContainer("hashicorp/consul:1.21")
+        .with_exposed_ports(8500)
+        .with_command("agent -dev -client=0.0.0.0")
+    )
+
+    with container:
+        wait_for_logs(container, "Consul agent running!", timeout=60)
+
+        host = container.get_container_host_ip()
+        port = container.get_exposed_port(8500)
+        yield f"http://{host}:{port}"
+
+
+@pytest.fixture(scope="session")
 def redpanda_bootstrap():
     from testcontainers.kafka import RedpandaContainer
 

@@ -2,3 +2,5 @@ confluent-kafka>=2.15.0
 pymongo>=4.17.0
 psycopg[binary]>=3.3.5
 PyMySQL==1.2.0
+httpx>=0.28
+backoff>=2.2
